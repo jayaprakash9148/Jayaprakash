@@ -3,30 +3,24 @@ import sqlite3
 import os
 
 app = Flask(__name__)
-
-DB_FILE = "voters.db"
+DB_PATH = "voters.db"
 
 # Initialize database if not exists
 def init_db():
-    if not os.path.exists(DB_FILE):
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        c.execute('''
+    if not os.path.exists(DB_PATH):
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute('''
             CREATE TABLE voters (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 has_voted INTEGER DEFAULT 0
             )
         ''')
-        # Example voters (optional)
-        c.execute("INSERT INTO voters (name, has_voted) VALUES ('Alice', 0)")
-        c.execute("INSERT INTO voters (name, has_voted) VALUES ('Bob', 1)")
         conn.commit()
         conn.close()
 
-# Get DB connection
 def get_db_connection():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -34,53 +28,56 @@ def get_db_connection():
 def home():
     return "Voting Server is Running!"
 
+# View all voters
+@app.route('/voters', methods=['GET'])
+def voters_list():
+    conn = get_db_connection()
+    voters = conn.execute("SELECT * FROM voters").fetchall()
+    conn.close()
+    
+    html = "<h2>Voter List</h2><table border='1'><tr><th>ID</th><th>Name</th><th>Voted</th></tr>"
+    for v in voters:
+        html += f"<tr><td>{v['id']}</td><td>{v['name']}</td><td>{'Yes' if v['has_voted'] else 'No'}</td></tr>"
+    html += "</table>"
+    return html
+
+# Add a voter
+@app.route('/add_voter', methods=['POST'])
+def add_voter():
+    data = request.get_json()
+    name = data.get("name")
+    if not name:
+        return jsonify({"status": "error", "message": "Name is required"}), 400
+
+    conn = get_db_connection()
+    conn.execute("INSERT INTO voters (name) VALUES (?)", (name,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": f"Voter '{name}' added successfully"})
+
+# Verify vote
 @app.route('/api/verify', methods=['POST'])
 def verify():
     data = request.get_json()
-    fingerprint_id = data.get("fingerprint_id")
+    voter_id = data.get("voter_id")
+    if voter_id is None:
+        return jsonify({"status": "error", "message": "Voter ID required"}), 400
 
     conn = get_db_connection()
-    voter = conn.execute("SELECT * FROM voters WHERE id = ?", (fingerprint_id,)).fetchone()
+    voter = conn.execute("SELECT * FROM voters WHERE id = ?", (voter_id,)).fetchone()
 
     if voter is None:
-        response = {"status": "error", "message": "Fingerprint not found"}
+        response = {"status": "error", "message": "Voter not found"}
     elif voter["has_voted"]:
         response = {"status": "error", "message": "Already voted"}
     else:
-        conn.execute("UPDATE voters SET has_voted = 1 WHERE id = ?", (fingerprint_id,))
+        conn.execute("UPDATE voters SET has_voted = 1 WHERE id = ?", (voter_id,))
         conn.commit()
         response = {"status": "success", "message": "Vote allowed"}
 
     conn.close()
     return jsonify(response)
 
-# Voters list page
-@app.route('/voters')
-def list_voters():
-    conn = get_db_connection()
-    voters = conn.execute("SELECT * FROM voters").fetchall()
-    conn.close()
-    
-    # Simple HTML table
-    html = '''
-    <h2>Voter List</h2>
-    <table border="1" cellpadding="5" cellspacing="0">
-        <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Voted</th>
-        </tr>
-        {% for voter in voters %}
-        <tr>
-            <td>{{ voter.id }}</td>
-            <td>{{ voter.name }}</td>
-            <td>{{ 'Yes' if voter.has_voted else 'No' }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-    '''
-    return render_template_string(html, voters=voters)
-
 if __name__ == "__main__":
-    init_db()  # Ensure DB is created
+    init_db()  # Ensure DB is ready before server starts
     app.run(host="0.0.0.0", port=5000, debug=True)
