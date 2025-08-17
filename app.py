@@ -209,4 +209,29 @@ def add_voter():
 @app.route('/logout', methods=['POST'])
 def logout():
     session.pop("admin_logged_in", None)
-    return redirect(url_for
+    return redirect(url_for('home'))
+
+# ------------------ API VERIFY ------------------
+@app.route('/api/verify', methods=['POST'])
+def verify():
+    data = request.get_json()
+    fingerprint_id = data.get("fingerprint_id")
+
+    conn = get_db_connection()
+    voter = conn.execute("SELECT * FROM voters WHERE fingerprint_id = ?", (fingerprint_id,)).fetchone()
+
+    if voter is None:
+        response = {"status": "error", "message": "Fingerprint not found"}
+    elif voter["has_voted"]:
+        response = {"status": "error", "message": "Already voted"}
+    else:
+        conn.execute("UPDATE voters SET has_voted = 1 WHERE fingerprint_id = ?", (fingerprint_id,))
+        conn.commit()
+        response = {"status": "success", "message": "Vote allowed"}
+
+    conn.close()
+    return jsonify(response)
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
