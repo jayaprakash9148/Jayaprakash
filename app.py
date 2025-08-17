@@ -67,23 +67,35 @@ def dashboard():
 def add_voter():
     if not session.get("admin"):
         return redirect(url_for("admin_login"))
-    name = request.form.get("name")
-    fingerprint_id = request.form.get("fingerprint_id")
+    
+    name = request.form.get("name", "").strip()
+    fingerprint_id = request.form.get("fingerprint_id", "").strip()
+
     if not name or not fingerprint_id:
         return redirect(url_for("dashboard"))
+
+    conn = get_db_connection()
     try:
-        conn = get_db_connection()
         conn.execute(
             "INSERT INTO voters (name, fingerprint_id) VALUES (?, ?)", 
-            (name.strip(), fingerprint_id.strip())
+            (name, fingerprint_id)
         )
         conn.commit()
         conn.close()
+        return redirect(url_for("dashboard"))
     except sqlite3.IntegrityError:
-        conn.close()  # fingerprint ID already exists
+        conn.close()
+        # Reload dashboard with error message for duplicate fingerprint ID
+        conn = get_db_connection()
+        voters = conn.execute("SELECT * FROM voters").fetchall()
+        conn.close()
+        return render_template_string(DASHBOARD_HTML, voters=voters, error="Fingerprint ID already exists")
     except Exception as e:
-        print("Error adding voter:", e)
-    return redirect(url_for("dashboard"))
+        conn.close()
+        conn = get_db_connection()
+        voters = conn.execute("SELECT * FROM voters").fetchall()
+        conn.close()
+        return render_template_string(DASHBOARD_HTML, voters=voters, error=f"Error adding voter: {e}")
 
 # Reset votes
 @app.route("/reset_votes", methods=["POST"])
@@ -183,6 +195,9 @@ input[type=submit]:hover { background:#004d40; }
 </head>
 <body>
 <h2>Voting Dashboard</h2>
+{% if error %}
+<p style="color:red; font-weight:bold;">{{ error }}</p>
+{% endif %}
 <div class="dashboard">
 <table>
 <tr><th>ID</th><th>Name</th><th>Fingerprint ID</th><th>Has Voted</th></tr>
