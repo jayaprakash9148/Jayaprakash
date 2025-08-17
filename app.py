@@ -11,8 +11,14 @@ ADMIN_PASSWORD = "admin123"
 
 # Create database if it doesn't exist
 def init_db():
+    # Check if DB file exists
+    db_exists = os.path.exists(DB_FILE)
+    
     conn = sqlite3.connect(DB_FILE)
-    conn.execute("""
+    cur = conn.cursor()
+    
+    # Create table if not exists (ensures fingerprint_id column exists)
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS voters (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -20,15 +26,16 @@ def init_db():
             has_voted INTEGER DEFAULT 0
         )
     """)
+    
     # Insert example voters only if table is empty
-    cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM voters")
     if cur.fetchone()[0] == 0:
-        conn.executemany("INSERT INTO voters (name, fingerprint_id) VALUES (?, ?)", [
+        cur.executemany("INSERT INTO voters (name, fingerprint_id) VALUES (?, ?)", [
             ("Alice", "FP1001"),
             ("Bob", "FP1002"),
             ("Charlie", "FP1003"),
         ])
+    
     conn.commit()
     conn.close()
 
