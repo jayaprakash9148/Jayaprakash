@@ -11,23 +11,26 @@ ADMIN_PASSWORD = "admin123"
 
 # Create database if it doesn't exist
 def init_db():
-    if not os.path.exists(DB_FILE):
-        conn = sqlite3.connect(DB_FILE)
-        conn.execute("""
-            CREATE TABLE voters (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                fingerprint_id TEXT UNIQUE NOT NULL,
-                has_voted INTEGER DEFAULT 0
-            )
-        """)
+    conn = sqlite3.connect(DB_FILE)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS voters (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            fingerprint_id TEXT UNIQUE NOT NULL,
+            has_voted INTEGER DEFAULT 0
+        )
+    """)
+    # Insert example voters only if table is empty
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM voters")
+    if cur.fetchone()[0] == 0:
         conn.executemany("INSERT INTO voters (name, fingerprint_id) VALUES (?, ?)", [
             ("Alice", "FP1001"),
             ("Bob", "FP1002"),
             ("Charlie", "FP1003"),
         ])
-        conn.commit()
-        conn.close()
+    conn.commit()
+    conn.close()
 
 init_db()
 
@@ -70,11 +73,16 @@ def add_voter():
         return redirect(url_for("dashboard"))
     try:
         conn = get_db_connection()
-        conn.execute("INSERT INTO voters (name, fingerprint_id) VALUES (?, ?)", (name, fingerprint_id))
+        conn.execute(
+            "INSERT INTO voters (name, fingerprint_id) VALUES (?, ?)", 
+            (name.strip(), fingerprint_id.strip())
+        )
         conn.commit()
         conn.close()
     except sqlite3.IntegrityError:
-        pass  # fingerprint ID already exists
+        conn.close()  # fingerprint ID already exists
+    except Exception as e:
+        print("Error adding voter:", e)
     return redirect(url_for("dashboard"))
 
 # Reset votes
