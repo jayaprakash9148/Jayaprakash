@@ -16,7 +16,7 @@ if not os.path.exists(DB_FILE):
             has_voted INTEGER DEFAULT 0
         )
     """)
-    # Example voters (you can replace with real data)
+    # Example voters
     conn.executemany("INSERT INTO voters (name, fingerprint_id) VALUES (?, ?)", [
         ("Alice", "FP1001"),
         ("Bob", "FP1002"),
@@ -32,7 +32,6 @@ def get_db_connection():
     return conn
 
 
-# Endpoint for ESP fingerprint verification
 @app.route('/api/verify', methods=['POST'])
 def verify():
     data = request.get_json()
@@ -54,7 +53,6 @@ def verify():
     return jsonify(response)
 
 
-# Endpoint to view all voters in browser
 @app.route('/voters')
 def show_voters():
     conn = get_db_connection()
@@ -65,22 +63,29 @@ def show_voters():
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Voters List</title>
+        <title>Voters Database</title>
+        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
         <style>
-            table { border-collapse: collapse; width: 50%; margin: auto; }
-            th, td { border: 1px solid black; padding: 8px; text-align: center; }
-            th { background-color: #f2f2f2; }
+            body { font-family: 'Roboto', sans-serif; background-color: #f9f9f9; text-align: center; margin: 0; padding: 0; }
+            h2 { background-color: #4CAF50; color: white; padding: 20px 0; margin: 0; }
+            table { border-collapse: collapse; width: 80%; margin: 30px auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
+            th { background-color: #4CAF50; color: white; }
+            tr:nth-child(even) { background-color: #f2f2f2; }
+            tr:hover { background-color: #ddd; }
+            .status-yes { color: green; font-weight: bold; }
+            .status-no { color: red; font-weight: bold; }
         </style>
     </head>
     <body>
-        <h2 style="text-align:center;">Voters Database</h2>
+        <h2>Voters Database</h2>
         <table>
             <tr><th>ID</th><th>Name</th><th>Has Voted</th></tr>
             {% for voter in voters %}
             <tr>
                 <td>{{ voter['id'] }}</td>
                 <td>{{ voter['name'] }}</td>
-                <td>{{ 'Yes' if voter['has_voted'] else 'No' }}</td>
+                <td class="{{ 'status-yes' if voter['has_voted'] else 'status-no' }}">{{ 'Yes' if voter['has_voted'] else 'No' }}</td>
             </tr>
             {% endfor %}
         </table>
@@ -90,10 +95,9 @@ def show_voters():
     return render_template_string(html, voters=voters)
 
 
-# Home page
 @app.route('/')
 def home():
-    return "Voting Server is Running!"
+    return "<h2 style='text-align:center;'>Voting Server is Running!</h2>"
 
 
 if __name__ == "__main__":
