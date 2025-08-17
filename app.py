@@ -3,13 +3,11 @@ import sqlite3
 import os
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"  # Needed for sessions
-
+app.secret_key = "your_secret_key"  # Replace with a strong secret key
 DB_FILE = "voters.db"
 
-# Admin credentials
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "password123"
+ADMIN_PASSWORD = "admin123"  # Replace with a secure password
 
 # Create database if it doesn't exist
 if not os.path.exists(DB_FILE):
@@ -37,88 +35,85 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+# ------------------- Routes -------------------
 
 @app.route('/')
 def home():
-    return redirect(url_for('admin_login'))
+    return redirect(url_for('login'))
 
-
-# Admin login page
 @app.route('/login', methods=['GET', 'POST'])
-def admin_login():
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
+def login():
+    message = ""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             session['admin_logged_in'] = True
-            return redirect(url_for('show_voters'))
+            return redirect(url_for('voters'))
         else:
-            return render_template_string(LOGIN_HTML, error="Invalid credentials")
-    return render_template_string(LOGIN_HTML, error=None)
+            message = "Invalid credentials"
+    return render_template_string(LOGIN_HTML, message=message)
 
-
-# Admin logout
 @app.route('/logout')
 def logout():
     session.pop('admin_logged_in', None)
-    return redirect(url_for('admin_login'))
+    return redirect(url_for('login'))
 
-
-# Show voters list (admin only)
 @app.route('/voters')
-def show_voters():
-    if not session.get('admin_logged_in'):
-        return redirect(url_for('admin_login'))
-
+def voters():
+    if 'admin_logged_in' not in session:
+        return redirect(url_for('login'))
     conn = get_db_connection()
     voters = conn.execute("SELECT * FROM voters").fetchall()
     conn.close()
     return render_template_string(VOTERS_HTML, voters=voters)
 
-
-# Add voter page (admin only)
 @app.route('/add_voter', methods=['GET', 'POST'])
 def add_voter():
-    if not session.get('admin_logged_in'):
-        return redirect(url_for('admin_login'))
-
+    if 'admin_logged_in' not in session:
+        return redirect(url_for('login'))
     message = ""
-    if request.method == "POST":
-        name = request.form.get("name")
-        fingerprint_id = request.form.get("fingerprint_id")
+    if request.method == 'POST':
+        name = request.form.get('name')
+        fingerprint_id = request.form.get('fingerprint_id')
         try:
             conn = get_db_connection()
-            conn.execute("INSERT INTO voters (name, fingerprint_id) VALUES (?, ?)", (name, fingerprint_id))
+            conn.execute(
+                "INSERT INTO voters (name, fingerprint_id) VALUES (?, ?)",
+                (name, fingerprint_id)
+            )
             conn.commit()
             conn.close()
-            message = f"Voter '{name}' added successfully!"
-        except sqlite3.IntegrityError:
-            message = "Fingerprint ID already exists!"
+            message = "Voter added successfully!"
+        except Exception as e:
+            message = f"Error: {e}"
+            print(message)  # Shows in Render logs
     return render_template_string(ADD_VOTER_HTML, message=message)
 
-
-# Reset votes (admin only)
 @app.route('/reset_votes', methods=['POST'])
 def reset_votes():
-    if not session.get('admin_logged_in'):
-        return redirect(url_for('admin_login'))
+    # First ask for admin password if not already provided
+    if 'admin_logged_in' not in session:
+        return redirect(url_for('login'))
+    password = request.form.get('password')
+    if password != ADMIN_PASSWORD:
+        return "Invalid password!"
+    try:
+        conn = get_db_connection()
+        conn.execute("UPDATE voters SET has_voted = 0")
+        conn.commit()
+        conn.close()
+        return redirect(url_for('voters'))
+    except Exception as e:
+        print(e)
+        return f"Error resetting votes: {e}"
 
-    conn = get_db_connection()
-    conn.execute("UPDATE voters SET has_voted = 0")
-    conn.commit()
-    conn.close()
-    return redirect(url_for('show_voters'))
-
-
-# API to verify fingerprint
 @app.route('/api/verify', methods=['POST'])
 def verify():
     data = request.get_json()
     fingerprint_id = data.get("fingerprint_id")
-
     conn = get_db_connection()
     voter = conn.execute("SELECT * FROM voters WHERE fingerprint_id = ?", (fingerprint_id,)).fetchone()
-
     if voter is None:
         response = {"status": "error", "message": "Fingerprint not found"}
     elif voter["has_voted"]:
@@ -127,31 +122,31 @@ def verify():
         conn.execute("UPDATE voters SET has_voted = 1 WHERE fingerprint_id = ?", (fingerprint_id,))
         conn.commit()
         response = {"status": "success", "message": "Vote allowed"}
-
     conn.close()
     return jsonify(response)
 
+# ------------------- HTML Templates -------------------
 
-# HTML Templates
 LOGIN_HTML = """
 <!DOCTYPE html>
 <html>
 <head>
     <title>Admin Login</title>
     <style>
-        body { font-family: Arial; background-color: #f4f4f4; text-align: center; padding-top: 50px; }
-        input { padding: 10px; margin: 5px; }
-        .error { color: red; font-weight: bold; }
+        body { font-family: Arial; background: #f2f2f2; text-align:center; padding-top:100px; }
+        input { padding:10px; margin:5px; }
+        button { padding:10px 20px; }
+        .message { color:red; font-weight:bold; }
     </style>
 </head>
 <body>
     <h2>Admin Login</h2>
-    {% if error %}<p class="error">{{ error }}</p>{% endif %}
     <form method="post">
         <input type="text" name="username" placeholder="Username" required><br>
         <input type="password" name="password" placeholder="Password" required><br>
-        <input type="submit" value="Login">
+        <button type="submit">Login</button>
     </form>
+    {% if message %}<p class="message">{{ message }}</p>{% endif %}
 </body>
 </html>
 """
@@ -160,29 +155,25 @@ VOTERS_HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Voters List</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <title>Voters Database</title>
     <style>
-        body { font-family: 'Roboto', sans-serif; background-color: #f9f9f9; text-align: center; margin: 0; padding: 0; }
-        h2 { background-color: #4CAF50; color: white; padding: 20px 0; margin: 0; }
-        table { border-collapse: collapse; width: 80%; margin: 30px auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
-        th { background-color: #4CAF50; color: white; }
-        tr:nth-child(even) { background-color: #f2f2f2; }
-        tr:hover { background-color: #ddd; }
-        .status-yes { color: green; font-weight: bold; }
-        .status-no { color: red; font-weight: bold; }
-        a { margin: 10px; display: inline-block; text-decoration: none; color: white; background-color: #4CAF50; padding: 8px 15px; border-radius: 5px; }
-        form { display: inline-block; }
+        body { font-family: Arial; background:#f9f9f9; text-align:center; }
+        h2 { background:#4CAF50; color:white; padding:20px; }
+        table { margin:auto; border-collapse: collapse; width:80%; box-shadow:0 2px 10px rgba(0,0,0,0.1); }
+        th, td { border:1px solid #ddd; padding:12px; text-align:center; }
+        th { background:#4CAF50; color:white; }
+        tr:nth-child(even){background:#f2f2f2;}
+        tr:hover{background:#ddd;}
+        .status-yes{color:green; font-weight:bold;}
+        .status-no{color:red; font-weight:bold;}
+        button { padding:8px 15px; margin:10px; }
+        a { text-decoration:none; padding:8px 15px; background:#2196F3; color:white; border-radius:5px; }
     </style>
 </head>
 <body>
     <h2>Voters Database</h2>
     <a href="/add_voter">Add Voter</a>
     <a href="/logout">Logout</a>
-    <form method="post" action="/reset_votes" onsubmit="return confirm('Are you sure you want to reset all votes?');">
-        <input type="submit" value="Reset Votes">
-    </form>
     <table>
         <tr><th>ID</th><th>Name</th><th>Fingerprint ID</th><th>Has Voted</th></tr>
         {% for voter in voters %}
@@ -194,6 +185,10 @@ VOTERS_HTML = """
         </tr>
         {% endfor %}
     </table>
+    <form method="post" action="/reset_votes">
+        <input type="password" name="password" placeholder="Enter Admin Password to Reset Votes" required>
+        <button type="submit">Reset Votes</button>
+    </form>
 </body>
 </html>
 """
@@ -204,21 +199,21 @@ ADD_VOTER_HTML = """
 <head>
     <title>Add Voter</title>
     <style>
-        body { font-family: Arial; background-color: #f4f4f4; text-align: center; padding-top: 50px; }
-        input { padding: 10px; margin: 5px; }
-        .message { color: green; font-weight: bold; }
+        body { font-family: Arial; background:#f2f2f2; text-align:center; padding-top:50px; }
+        input { padding:10px; margin:5px; }
+        button { padding:10px 20px; }
+        .message { font-weight:bold; color:green; }
     </style>
 </head>
 <body>
-    <h2>Add New Voter</h2>
-    {% if message %}<p class="message">{{ message }}</p>{% endif %}
+    <h2>Add Voter</h2>
     <form method="post">
         <input type="text" name="name" placeholder="Voter Name" required><br>
         <input type="text" name="fingerprint_id" placeholder="Fingerprint ID" required><br>
-        <input type="submit" value="Add Voter">
+        <button type="submit">Add Voter</button>
     </form>
-    <br>
-    <a href="/voters">Back to Voters List</a>
+    {% if message %}<p class="message">{{ message }}</p>{% endif %}
+    <br><a href="/voters">Back to Voters List</a>
 </body>
 </html>
 """
