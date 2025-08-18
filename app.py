@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template_string, redirect, url_for, session
+from flask import Flask, request, jsonify, render_template_string, redirect, url_for, session, flash
 import sqlite3
 import os
 
@@ -17,34 +17,22 @@ def get_db_connection():
     return conn
 
 def migrate_db():
-    """
-    Ensure the 'fingerprint_id' column exists even if the table was created earlier
-    without it. Adds the column if missing and creates a partial UNIQUE index so
-    non-empty values are unique.
-    """
     conn = get_db_connection()
     cur = conn.cursor()
-
-    # Check current columns
     cur.execute("PRAGMA table_info(voters)")
     cols = [row["name"] if isinstance(row, sqlite3.Row) else row[1] for row in cur.fetchall()]
 
     if "fingerprint_id" not in cols:
-        # Add column (nullable so migration succeeds on existing rows)
         cur.execute("ALTER TABLE voters ADD COLUMN fingerprint_id TEXT")
         conn.commit()
-
-        # Make non-empty fingerprint_id values unique
         cur.execute("""
             CREATE UNIQUE INDEX IF NOT EXISTS idx_voters_fpid
             ON voters(fingerprint_id)
             WHERE fingerprint_id IS NOT NULL AND fingerprint_id != '';
         """)
         conn.commit()
-
     conn.close()
 
-# Create database if it doesn't exist
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     conn.execute("""
@@ -55,7 +43,6 @@ def init_db():
             has_voted INTEGER DEFAULT 0
         )
     """)
-    # Insert example voters only if table is empty
     cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM voters")
     if cur.fetchone()[0] == 0:
@@ -67,13 +54,11 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Run setup & migration on startup
 init_db()
 migrate_db()
 
 # --- Routes ----------------------------------------------------------------
 
-# Admin login
 @app.route("/admin", methods=["GET", "POST"])
 def admin_login():
     if request.method == "POST":
@@ -86,7 +71,6 @@ def admin_login():
             return render_template_string(LOGIN_HTML, error="Invalid credentials")
     return render_template_string(LOGIN_HTML)
 
-# Admin dashboard
 @app.route("/dashboard")
 def dashboard():
     if not session.get("admin"):
@@ -96,7 +80,6 @@ def dashboard():
     conn.close()
     return render_template_string(DASHBOARD_HTML, voters=voters)
 
-# Add voter
 @app.route("/add_voter", methods=["POST"])
 def add_voter():
     if not session.get("admin"):
@@ -119,7 +102,6 @@ def add_voter():
         return redirect(url_for("dashboard"))
     except sqlite3.IntegrityError:
         conn.close()
-        # Reload dashboard with error message for duplicate fingerprint ID
         conn = get_db_connection()
         voters = conn.execute("SELECT * FROM voters").fetchall()
         conn.close()
@@ -131,7 +113,23 @@ def add_voter():
         conn.close()
         return render_template_string(DASHBOARD_HTML, voters=voters, error=f"Error adding voter: {e}")
 
-# Reset votes
+@app.route("/delete_voter/<int:voter_id>", methods=["POST"])
+def delete_voter(voter_id):
+    if not session.get("admin"):
+        return redirect(url_for("admin_login"))
+
+    password = request.form.get("password")
+    if password != ADMIN_PASSWORD:
+        flash("❌ Wrong admin password. Voter not deleted.")
+        return redirect(url_for("dashboard"))
+
+    conn = get_db_connection()
+    conn.execute("DELETE FROM voters WHERE id = ?", (voter_id,))
+    conn.commit()
+    conn.close()
+    flash("✅ Voter deleted successfully.")
+    return redirect(url_for("dashboard"))
+
 @app.route("/reset_votes", methods=["POST"])
 def reset_votes():
     if not session.get("admin"):
@@ -146,13 +144,11 @@ def reset_votes():
     conn.close()
     return redirect(url_for("dashboard"))
 
-# Admin logout
 @app.route("/logout")
 def logout():
     session.pop("admin", None)
     return redirect(url_for("admin_login"))
 
-# API to verify fingerprint
 @app.route('/api/verify', methods=['POST'])
 def verify():
     data = request.get_json()
@@ -173,7 +169,8 @@ def verify():
     conn.close()
     return jsonify(response)
 
-# HTML Templates with enhanced UI
+# --- HTML ------------------------------------------------------------------
+
 LOGIN_HTML = """
 <!DOCTYPE html>
 <html>
@@ -219,28 +216,47 @@ th { background:#004d40; color:white; }
 tr:nth-child(even){background:#e0f2f1;}
 .status-yes { color:green; font-weight:bold; }
 .status-no { color:red; font-weight:bold; }
-form { margin:20px; display:inline-block; }
+form { margin:10px; display:inline-block; }
 input { padding:10px; margin:5px; border-radius:5px; border:1px solid #ccc; }
 input[type=submit] { background:#00796b; color:white; border:none; cursor:pointer; }
 input[type=submit]:hover { background:#004d40; }
 .logout { display:block; margin-top:20px; background:#c62828; padding:10px 20px; color:white; text-decoration:none; border-radius:5px; width:120px; margin-left:auto; margin-right:auto; }
 .logout:hover { background:#b71c1c; }
+.flash { color:red; font-weight:bold; margin:10px; }
 </style>
 </head>
 <body>
 <h2>Voting Dashboard</h2>
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="flash">
+      {% for message in messages %}
+        <p>{{ message }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
+
 {% if error %}
 <p style="color:red; font-weight:bold;">{{ error }}</p>
 {% endif %}
+
 <div class="dashboard">
 <table>
-<tr><th>ID</th><th>Name</th><th>Fingerprint ID</th><th>Has Voted</th></tr>
+<tr><th>ID</th><th>Name</th><th>Fingerprint ID</th><th>Has Voted</th><th>Delete</th></tr>
 {% for voter in voters %}
 <tr>
 <td>{{ voter['id'] }}</td>
 <td>{{ voter['name'] }}</td>
 <td>{{ voter['fingerprint_id'] }}</td>
 <td class="{{ 'status-yes' if voter['has_voted'] else 'status-no' }}">{{ 'Yes' if voter['has_voted'] else 'No' }}</td>
+<td>
+  <form method="post" action="/delete_voter/{{ voter['id'] }}">
+    <input type="password" name="password" placeholder="Admin Password" required>
+    <input type="submit" value="Delete">
+  </form>
+</td>
 </tr>
 {% endfor %}
 </table>
