@@ -9,16 +9,45 @@ DB_FILE = "voters.db"
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin123"
 
+# --- DB setup & migration helpers ------------------------------------------
+
+def get_db_connection():
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def migrate_db():
+    """
+    Ensure the 'fingerprint_id' column exists even if the table was created earlier
+    without it. Adds the column if missing and creates a partial UNIQUE index so
+    non-empty values are unique.
+    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Check current columns
+    cur.execute("PRAGMA table_info(voters)")
+    cols = [row["name"] if isinstance(row, sqlite3.Row) else row[1] for row in cur.fetchall()]
+
+    if "fingerprint_id" not in cols:
+        # Add column (nullable so migration succeeds on existing rows)
+        cur.execute("ALTER TABLE voters ADD COLUMN fingerprint_id TEXT")
+        conn.commit()
+
+        # Make non-empty fingerprint_id values unique
+        cur.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_voters_fpid
+            ON voters(fingerprint_id)
+            WHERE fingerprint_id IS NOT NULL AND fingerprint_id != '';
+        """)
+        conn.commit()
+
+    conn.close()
+
 # Create database if it doesn't exist
 def init_db():
-    # Check if DB file exists
-    db_exists = os.path.exists(DB_FILE)
-    
     conn = sqlite3.connect(DB_FILE)
-    cur = conn.cursor()
-    
-    # Create table if not exists (ensures fingerprint_id column exists)
-    cur.execute("""
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS voters (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -26,25 +55,23 @@ def init_db():
             has_voted INTEGER DEFAULT 0
         )
     """)
-    
     # Insert example voters only if table is empty
+    cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM voters")
     if cur.fetchone()[0] == 0:
-        cur.executemany("INSERT INTO voters (name, fingerprint_id) VALUES (?, ?)", [
+        conn.executemany("INSERT INTO voters (name, fingerprint_id) VALUES (?, ?)", [
             ("Alice", "FP1001"),
             ("Bob", "FP1002"),
             ("Charlie", "FP1003"),
         ])
-    
     conn.commit()
     conn.close()
 
+# Run setup & migration on startup
 init_db()
+migrate_db()
 
-def get_db_connection():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    return conn
+# --- Routes ----------------------------------------------------------------
 
 # Admin login
 @app.route("/admin", methods=["GET", "POST"])
