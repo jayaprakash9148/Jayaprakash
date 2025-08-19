@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Stats · Election Server</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body class="center">
+  <div class="card" style="max-width: 520px; width: 100%;">
+    <div class="header">
+      <h2>Live Stats</h2>
+      <a class="btn" href="{{ url_for('home') }}">Home</a>
+    </div>
+    <p>Total registered voters: <strong>{{ total }}</strong></p>
+    <p>Votes cast: <strong>{{ voted }}</strong></p>
+    <p>Not yet voted: <strong>{{ total - voted }}</strong></p>
+
+    {% if session.get('admin') %}
+      <div class="footer-actions">
+        <a class="btn" href="{{ url_for('voters') }}">Manage Voters</a>
+        <a class="btn btn-danger" href="{{ url_for('logout') }}">Logout</a>
+      </div>
+    {% else %}
+      <p class="small">Admin? <a class="btn" href="{{ url_for('login') }}">Login</a></p>
+    {% endif %}
+  </div>
+</body>
+</html>

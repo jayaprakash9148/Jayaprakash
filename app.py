@@ -1,310 +1,196 @@
-from flask import Flask, request, jsonify, render_template_string, redirect, url_for, session, flash  
-import sqlite3  
-import os  
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+import sqlite3, os
 
-app = Flask(__name__)  
-app.secret_key = "supersecretkey"  # change this to a strong secret  
+app = Flask(__name__)
+app.secret_key = "supersecretkey"  # change this
 
-DB_FILE = "voters.db"  
-ADMIN_USERNAME = "admin"  
-ADMIN_PASSWORD = "admin123"  
+DB_NAME = "voters.db"
+ADMIN_PASSWORD = "admin123"        # change this
 
-# --- DB setup & migration helpers ------------------------------------------  
+# ---------- DATABASE SETUP ----------
+def init_db():
+    conn = sqlite3.connect(DB_NAME)
+    c = conn.cursor()
+    # Persistent table; NO dummy seeding
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS voters (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            fingerprint_template BLOB NOT NULL,
+            has_voted INTEGER DEFAULT 0
+        )
+    """)
+    conn.commit()
+    conn.close()
 
-def get_db_connection():  
-    conn = sqlite3.connect(DB_FILE)  
-    conn.row_factory = sqlite3.Row  
-    return conn  
+init_db()
 
-def migrate_db():  
-    conn = get_db_connection()  
-    cur = conn.cursor()  
-    cur.execute("PRAGMA table_info(voters)")  
-    cols = [row["name"] if isinstance(row, sqlite3.Row) else row[1] for row in cur.fetchall()]  
+def get_db():
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-    if "fingerprint_id" not in cols:  
-        cur.execute("ALTER TABLE voters ADD COLUMN fingerprint_id TEXT")  
-        conn.commit()  
-        cur.execute("""  
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_voters_fpid  
-            ON voters(fingerprint_id)  
-            WHERE fingerprint_id IS NOT NULL AND fingerprint_id != '';  
-        """)  
-        conn.commit()  
-    conn.close()  
+# ---------- ROUTES ----------
+@app.route('/')
+def home():
+    return render_template('index.html')
 
-def init_db():  
-    conn = sqlite3.connect(DB_FILE)  
-    conn.execute("""  
-        CREATE TABLE IF NOT EXISTS voters (  
-            id INTEGER PRIMARY KEY AUTOINCREMENT,  
-            name TEXT NOT NULL,  
-            fingerprint_id TEXT UNIQUE NOT NULL,  
-            has_voted INTEGER DEFAULT 0  
-        )  
-    """)  
-    cur = conn.cursor()  
-    cur.execute("SELECT COUNT(*) FROM voters")  
-    if cur.fetchone()[0] == 0:  
-        conn.executemany("INSERT INTO voters (name, fingerprint_id) VALUES (?, ?)", [  
-            ("Alice", "FP1001"),  
-            ("Bob", "FP1002"),  
-            ("Charlie", "FP1003"),  
-        ])  
-    conn.commit()  
-    conn.close()  
+@app.route('/login', methods=['GET','POST'])
+def login():
+    if request.method == 'POST':
+        pwd = request.form.get('password', '')
+        if pwd == ADMIN_PASSWORD:
+            session['admin'] = True
+            return redirect(url_for('voters'))
+        flash("Invalid password", "danger")
+    return render_template('login.html')
 
-init_db()  
-migrate_db()  
+@app.route('/logout')
+def logout():
+    session.pop('admin', None)
+    return redirect(url_for('home'))
 
-# --- Routes ----------------------------------------------------------------  
+@app.route('/voters')
+def voters():
+    if 'admin' not in session: 
+        return redirect(url_for('login'))
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM voters ORDER BY id").fetchall()
+    conn.close()
+    return render_template('voters.html', voters=rows)
 
-@app.route("/admin", methods=["GET", "POST"])  
-def admin_login():  
-    if request.method == "POST":  
-        username = request.form.get("username")  
-        password = request.form.get("password")  
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:  
-            session["admin"] = True  
-            return redirect(url_for("dashboard"))  
-        else:  
-            return render_template_string(LOGIN_HTML, error="Invalid credentials")  
-    return render_template_string(LOGIN_HTML)  
+@app.route('/add_voter', methods=['POST'])
+def add_voter():
+    if 'admin' not in session: 
+        return redirect(url_for('login'))
+    name = (request.form.get('name') or '').strip()
+    template_text = (request.form.get('fingerprint_template') or '').strip()
+    if not name or not template_text:
+        flash("Name and fingerprint template are required.", "danger")
+        return redirect(url_for('voters'))
 
-@app.route("/dashboard")  
-def dashboard():  
-    if not session.get("admin"):  
-        return redirect(url_for("admin_login"))  
-    conn = get_db_connection()  
-    voters = conn.execute("SELECT * FROM voters ORDER BY id").fetchall()  
-    conn.close()  
-    return render_template_string(DASHBOARD_HTML, voters=voters)  
+    # Store raw template bytes (server-side matching)
+    tpl_bytes = template_text.encode('utf-8')
+    conn = get_db()
+    conn.execute("INSERT INTO voters (name, fingerprint_template) VALUES (?, ?)", (name, tpl_bytes))
+    conn.commit()
+    conn.close()
+    flash("Voter added successfully.", "success")
+    return redirect(url_for('voters'))
 
-@app.route("/add_voter", methods=["POST"])  
-def add_voter():  
-    if not session.get("admin"):  
-        return redirect(url_for("admin_login"))  
-    
-    name = request.form.get("name", "").strip()  
-    fingerprint_id = request.form.get("fingerprint_id", "").strip()  
+@app.route('/delete_voter/<int:vid>', methods=['POST'])
+def delete_voter(vid):
+    if 'admin' not in session: 
+        return redirect(url_for('login'))
 
-    if not name or not fingerprint_id:  
-        return redirect(url_for("dashboard"))  
+    password = request.form.get('password', '')
+    if password != ADMIN_PASSWORD:
+        flash("❌ Wrong admin password. Voter not deleted.", "danger")
+        return redirect(url_for('voters'))
 
-    conn = get_db_connection()  
-    try:  
-        conn.execute(  
-            "INSERT INTO voters (name, fingerprint_id) VALUES (?, ?)",   
-            (name, fingerprint_id)  
-        )  
-        conn.commit()  
-        conn.close()  
-        return redirect(url_for("dashboard"))  
-    except sqlite3.IntegrityError:  
-        conn.close()  
-        conn = get_db_connection()  
-        voters = conn.execute("SELECT * FROM voters").fetchall()  
-        conn.close()  
-        return render_template_string(DASHBOARD_HTML, voters=voters, error="Fingerprint ID already exists")  
-    except Exception as e:  
-        conn.close()  
-        conn = get_db_connection()  
-        voters = conn.execute("SELECT * FROM voters").fetchall()  
-        conn.close()  
-        return render_template_string(DASHBOARD_HTML, voters=voters, error=f"Error adding voter: {e}")  
+    conn = get_db()
+    conn.execute("DELETE FROM voters WHERE id=?", (vid,))
+    conn.commit()
 
-@app.route("/delete_voter/<int:voter_id>", methods=["POST"])  
-def delete_voter(voter_id):  
-    if not session.get("admin"):  
-        return redirect(url_for("admin_login"))  
+    # Resequence IDs to keep them tidy
+    rows = conn.execute("SELECT id FROM voters ORDER BY id").fetchall()
+    new_id = 1
+    for r in rows:
+        old_id = r['id']
+        if old_id != new_id:
+            conn.execute("UPDATE voters SET id=? WHERE id=?", (new_id, old_id))
+        new_id += 1
+    conn.commit()
+    conn.close()
 
-    password = request.form.get("password")  
-    if password != ADMIN_PASSWORD:  
-        flash("❌ Wrong admin password. Voter not deleted.")  
-        return redirect(url_for("dashboard"))  
+    flash("✅ Voter deleted and IDs resequenced.", "success")
+    return redirect(url_for('voters'))
 
-    conn = get_db_connection()  
-    conn.execute("DELETE FROM voters WHERE id = ?", (voter_id,))  
-    conn.commit()  
+@app.route('/reset_votes', methods=['POST'])
+def reset_votes():
+    if 'admin' not in session: 
+        return redirect(url_for('login'))
+    password = request.form.get('password', '')
+    if password != ADMIN_PASSWORD:
+        flash("❌ Wrong admin password. Votes not reset.", "danger")
+        return redirect(url_for('voters'))
 
-    # Re-arrange IDs sequentially  
-    rows = conn.execute("SELECT id FROM voters ORDER BY id").fetchall()  
-    new_id = 1  
-    for row in rows:  
-        old_id = row["id"]  
-        if old_id != new_id:  
-            conn.execute("UPDATE voters SET id=? WHERE id=?", (new_id, old_id))  
-        new_id += 1  
-    conn.commit()  
-    conn.close()  
+    conn = get_db()
+    conn.execute("UPDATE voters SET has_voted=0")
+    conn.commit()
+    conn.close()
+    flash("✅ All votes reset.", "success")
+    return redirect(url_for('voters'))
 
-    flash("✅ Voter deleted and IDs rearranged.")  
-    return redirect(url_for("dashboard"))  
+@app.route('/reset_all', methods=['POST'])
+def reset_all():
+    # Optional: full DB wipe (kept for completeness; not used by UI)
+    if 'admin' not in session: 
+        return redirect(url_for('login'))
+    password = request.form.get('password', '')
+    if password != ADMIN_PASSWORD:
+        flash("❌ Wrong admin password. Nothing reset.", "danger")
+        return redirect(url_for('voters'))
+    conn = get_db()
+    conn.execute("DELETE FROM voters")
+    conn.commit()
+    conn.close()
+    flash("✅ All voters cleared.", "success")
+    return redirect(url_for('voters'))
 
-@app.route("/reset_votes", methods=["POST"])  
-def reset_votes():  
-    if not session.get("admin"):  
-        return redirect(url_for("admin_login"))  
-    username = request.form.get("username")  
-    password = request.form.get("password")  
-    if username != ADMIN_USERNAME or password != ADMIN_PASSWORD:  
-        flash("❌ Wrong admin credentials. Votes not reset.")  
-        return redirect(url_for("dashboard"))  
-    conn = get_db_connection()  
-    conn.execute("UPDATE voters SET has_voted = 0")  
-    conn.commit()  
-    conn.close()  
-    flash("✅ All votes reset successfully.")  
-    return redirect(url_for("dashboard"))  
+# ---------- VOTE (optional demo endpoint) ----------
+@app.route('/vote/<int:vid>', methods=['POST'])
+def vote(vid):
+    conn = get_db()
+    voter = conn.execute("SELECT has_voted FROM voters WHERE id=?", (vid,)).fetchone()
+    if not voter:
+        conn.close()
+        return jsonify({"status":"error","message":"Voter not found"})
+    if voter['has_voted'] == 1:
+        conn.close()
+        return jsonify({"status":"error","message":"Already voted"})
+    conn.execute("UPDATE voters SET has_voted=1 WHERE id=?", (vid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status":"success","message":"Vote cast"})
 
-@app.route("/logout")  
-def logout():  
-    session.pop("admin", None)  
-    return redirect(url_for("admin_login"))  
+# ---------- FINGERPRINT MATCH (ESP32 -> Server) ----------
+@app.route('/match_fingerprint', methods=['POST'])
+def match_fingerprint():
+    """
+    ESP32 sends JSON: { "fingerprint_template": "<raw_serialized_string>" }
+    Server compares raw bytes with stored templates (exact match baseline).
+    """
+    payload = request.get_json(silent=True) or {}
+    tpl_text = payload.get("fingerprint_template", "")
+    if not tpl_text:
+        return jsonify({"status":"error","message":"No template provided"}), 400
 
-@app.route('/api/verify', methods=['POST'])  
-def verify():  
-    data = request.get_json()  
-    fingerprint_id = data.get("fingerprint_id")  
+    tpl_bytes = tpl_text.encode('utf-8')
+    conn = get_db()
+    rows = conn.execute("SELECT id, name, fingerprint_template, has_voted FROM voters").fetchall()
+    conn.close()
 
-    conn = get_db_connection()  
-    voter = conn.execute("SELECT * FROM voters WHERE fingerprint_id = ?", (fingerprint_id,)).fetchone()  
+    for r in rows:
+        if r['fingerprint_template'] == tpl_bytes:
+            return jsonify({
+                "status": "success",
+                "id": r['id'],
+                "name": r['name'],
+                "has_voted": r['has_voted']
+            })
 
-    if voter is None:  
-        response = {"status": "error", "message": "Fingerprint not found"}  
-    elif voter["has_voted"]:  
-        response = {"status": "error", "message": "Already voted"}  
-    else:  
-        conn.execute("UPDATE voters SET has_voted = 1 WHERE fingerprint_id = ?", (fingerprint_id,))  
-        conn.commit()  
-        response = {"status": "success", "message": "Vote allowed"}  
-    
-    conn.close()  
-    return jsonify(response)  
+    return jsonify({"status":"error","message":"Fingerprint not recognized"}), 404
 
-# --- HTML ------------------------------------------------------------------  
+# ---------- STATS ----------
+@app.route('/stats')
+def stats():
+    conn = get_db()
+    total = conn.execute("SELECT COUNT(*) AS c FROM voters").fetchone()['c']
+    voted = conn.execute("SELECT COUNT(*) AS c FROM voters WHERE has_voted=1").fetchone()['c']
+    conn.close()
+    return render_template('stats.html', total=total, voted=voted)
 
-LOGIN_HTML = """  
-<!DOCTYPE html>  
-<html>  
-<head>  
-<title>Admin Login</title>  
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">  
-<style>  
-body { font-family: 'Roboto', sans-serif; background:#e0f7fa; display:flex; justify-content:center; align-items:center; height:100vh; }  
-.login-box { background:white; padding:30px; border-radius:10px; box-shadow:0 5px 15px rgba(0,0,0,0.3); width:300px; text-align:center; }  
-input { width:90%; padding:10px; margin:10px 0; border-radius:5px; border:1px solid #ccc; }  
-input[type=submit] { background:#00796b; color:white; border:none; cursor:pointer; }  
-input[type=submit]:hover { background:#004d40; }  
-.error { color:red; }  
-</style>  
-</head>  
-<body>  
-<div class="login-box">  
-<h2>Admin Login</h2>  
-{% if error %}<p class="error">{{ error }}</p>{% endif %}  
-<form method="post">  
-<input type="text" name="username" placeholder="Username" required>  
-<input type="password" name="password" placeholder="Password" required>  
-<input type="submit" value="Login">  
-</form>  
-</div>  
-</body>  
-</html>  
-"""  
-
-DASHBOARD_HTML = """  
-<!DOCTYPE html>  
-<html>  
-<head>  
-<title>Voting Dashboard</title>  
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">  
-<style>  
-body { font-family: 'Roboto', sans-serif; background:#f2f2f2; text-align:center; margin:0; padding:0; }  
-h2 { background:#00796b; color:white; padding:20px 0; margin:0; }  
-.dashboard { padding:20px; }  
-table { border-collapse: collapse; margin:auto; width:90%; box-shadow:0 5px 15px rgba(0,0,0,0.1); }  
-th, td { padding:12px; border:1px solid #ddd; text-align:center; }  
-th { background:#004d40; color:white; }  
-tr:nth-child(even){background:#e0f2f1;}  
-.status-yes { color:green; font-weight:bold; }  
-.status-no { color:red; font-weight:bold; }  
-form { margin:10px; display:inline-block; }  
-input { padding:10px; margin:5px; border-radius:5px; border:1px solid #ccc; }  
-input[type=submit] { background:#00796b; color:white; border:none; cursor:pointer; }  
-input[type=submit]:hover { background:#004d40; }  
-.logout { display:block; margin-top:20px; background:#c62828; padding:10px 20px; color:white; text-decoration:none; border-radius:5px; width:120px; margin-left:auto; margin-right:auto; }  
-.logout:hover { background:#b71c1c; }  
-.flash { color:red; font-weight:bold; margin:10px; }  
-</style>  
-<script>  
-function confirmDelete() {  
-    return confirm("Are you sure you want to delete this voter? This action cannot be undone.");  
-}  
-function confirmReset() {  
-    return confirm("Are you sure you want to reset all votes?");  
-}  
-</script>  
-</head>  
-<body>  
-<h2>Voting Dashboard</h2>  
-
-{% with messages = get_flashed_messages() %}  
-  {% if messages %}  
-    <div class="flash">  
-      {% for message in messages %}  
-        <p>{{ message }}</p>  
-      {% endfor %}  
-    </div>  
-  {% endif %}  
-{% endwith %}  
-
-{% if error %}  
-<p style="color:red; font-weight:bold;">{{ error }}</p>  
-{% endif %}  
-
-<div class="dashboard">  
-<table>  
-<tr><th>ID</th><th>Name</th><th>Fingerprint ID</th><th>Has Voted</th><th>Delete</th></tr>  
-{% for voter in voters %}  
-<tr>  
-<td>{{ voter['id'] }}</td>  
-<td>{{ voter['name'] }}</td>  
-<td>{{ voter['fingerprint_id'] }}</td>  
-<td class="{{ 'status-yes' if voter['has_voted'] else 'status-no' }}">{{ 'Yes' if voter['has_voted'] else 'No' }}</td>  
-<td>  
-  <form method="post" action="/delete_voter/{{ voter['id'] }}" onsubmit="return confirmDelete()">  
-    <input type="password" name="password" placeholder="Admin Password" required>  
-    <input type="submit" value="Delete">  
-  </form>  
-</td>  
-</tr>  
-{% endfor %}  
-</table>  
-
-<h3>Add Voter</h3>  
-<form method="post" action="/add_voter">  
-<input type="text" name="name" placeholder="Name" required>  
-<input type="text" name="fingerprint_id" placeholder="Fingerprint ID" required>  
-<input type="submit" value="Add">  
-</form>  
-
-<h3>Reset Votes</h3>  
-<form method="post" action="/reset_votes" onsubmit="return confirmReset()">  
-<input type="text" name="username" placeholder="Username" required>  
-<input type="password" name="password" placeholder="Password" required>  
-<input type="submit" value="Reset Votes">  
-</form>  
-
-<a class="logout" href="/logout">Logout</a>  
-</div>  
-</body>  
-</html>  
-"""  
-
-@app.route('/')  
-def home():  
-    return redirect(url_for("admin_login"))  
-
-if __name__ == "__main__":  
-    app.run(host="0.0.0.0", port=5000, debug=True)  
+# ---------- RUN ----------
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=5000)

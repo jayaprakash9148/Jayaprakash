@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Election Server</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body class="center">
+  <div class="card" style="max-width: 520px; width: 100%;">
+    <h1>Election Voting System</h1>
+    <p class="small">Secure admin dashboard, fingerprint matching, and live stats.</p>
+    <div class="footer-actions">
+      <a class="btn btn-success" href="{{ url_for('login') }}">Admin Login</a>
+      <a class="btn" href="{{ url_for('stats') }}">Live Stats</a>
+    </div>
+  </div>
+</body>
+</html>

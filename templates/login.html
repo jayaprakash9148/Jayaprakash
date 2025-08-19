@@ -1,14 +1,33 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
 <head>
-  <title>Admin Login</title>
+  <meta charset="utf-8">
+  <title>Admin Login · Election Server</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body>
-  <h2>Admin Login</h2>
-  <form method="POST">
-    Username: <input type="text" name="username" required><br><br>
-    Password: <input type="password" name="password" required><br><br>
-    <input type="submit" value="Login">
-  </form>
+<body class="center">
+  <div class="card" style="max-width: 420px; width: 100%;">
+    <div class="header">
+      <h2>Admin Login</h2>
+      <a class="btn" href="{{ url_for('home') }}">Home</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for cat, msg in messages %}
+          <div class="flash">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="post">
+      <label class="small">Password</label>
+      <input class="password" type="password" name="password" placeholder="Enter admin password" required>
+      <div class="footer-actions">
+        <button class="btn btn-success" type="submit">Login</button>
+      </div>
+    </form>
+  </div>
 </body>
 </html>
