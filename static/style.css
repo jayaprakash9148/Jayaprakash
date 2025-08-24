@@ -1,162 +1,95 @@
-:root{
-    --bg1: #09163a;
-    --bg2: #1d2b64;
-    --accent: #00e0ff;
-    --card-bg: rgba(0,0,0,0.45);
-    --card-border: rgba(255,255,255,0.15);
-    --text: #f5f7ff;
-    --muted: #c7cbe3;
-    --success: #28a745;
-    --danger: #e63946;
-    --warning: #ffb703;
-  }
-  
-  * { box-sizing: border-box; }
-  
-  html, body {
-    height: 100%;
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
     margin: 0;
-    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    color: var(--text);
-  }
-  
-  body {
-    /* Gradient + subtle election-themed image */
-    background:
-      linear-gradient(135deg, rgba(9,22,58,0.95), rgba(29,43,100,0.92)),
-      url("https://images.unsplash.com/photo-1593113598332-dfef8f2b3d19?q=80&w=1600&auto=format&fit=crop") no-repeat center/cover fixed;
-  }
-  
-  .container {
-    max-width: 1100px;
-    margin: 40px auto;
-    padding: 24px;
-  }
-  
-  .card {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    border-radius: 16px;
-    padding: 24px;
-    backdrop-filter: blur(6px);
-  }
-  
-  h1, h2, h3 {
-    margin: 0 0 16px;
-    letter-spacing: 0.3px;
-  }
-  
-  .header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 16px;
-  }
-  
-  .btn {
-    display: inline-block;
-    background: transparent;
-    border: 1px solid var(--accent);
-    color: var(--text);
-    padding: 10px 16px;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: 0.2s ease;
-    text-decoration: none;
-  }
-  .btn:hover {
-    background: rgba(0,224,255,0.12);
-  }
-  
-  .btn-danger {
-    border-color: var(--danger);
-  }
-  .btn-danger:hover {
-    background: rgba(230,57,70,0.15);
-  }
-  
-  .btn-success {
-    border-color: var(--success);
-  }
-  .btn-success:hover {
-    background: rgba(40,167,69,0.15);
-  }
-  
-  .input, .password {
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid var(--card-border);
-    background: rgba(255,255,255,0.06);
-    color: var(--text);
-    outline: none;
-  }
-  
-  .row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-  }
-  @media (max-width: 800px) {
-    .row { grid-template-columns: 1fr; }
-  }
-  
-  .table-wrap {
-    overflow-x: auto;
-  }
-  
-  table {
+    padding: 0;
+}
+
+header {
+    background-color: #007bff;
+    color: white;
+    padding: 15px 0;
+    text-align: center;
+}
+
+.container {
+    width: 90%;
+    max-width: 1000px;
+    margin: 20px auto;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0px 0px 10px #ccc;
+}
+
+h1, h2, h3 {
+    text-align: center;
+}
+
+table {
     width: 100%;
     border-collapse: collapse;
-    background: rgba(255,255,255,0.03);
-    border-radius: 12px;
-    overflow: hidden;
-  }
-  th, td {
-    padding: 12px 10px;
-    border-bottom: 1px solid var(--card-border);
-    text-align: left;
-    white-space: nowrap;
-  }
-  th { color: var(--muted); font-weight: 600; }
-  td { color: var(--text); }
-  
-  .badge {
-    padding: 4px 8px;
-    border-radius: 999px;
-    font-size: 12px;
-    border: 1px solid var(--card-border);
-  }
-  .badge-yes { border-color: var(--success); color: #bdf7ca; }
-  .badge-no  { border-color: var(--warning); color: #ffe9b5; }
-  
-  .flash {
-    margin-bottom: 12px;
-    padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid var(--card-border);
-    background: rgba(255,255,255,0.06);
-  }
-  
-  .footer-actions {
-    margin-top: 18px;
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  
-  .center {
-    min-height: 100%;
-    display: grid;
-    place-items: center;
-    padding: 24px;
-  }
-  
-  .small {
-    font-size: 12px;
-    color: var(--muted);
-    margin-top: 6px;
-  }
-  
+    margin-top: 15px;
+}
+
+table, th, td {
+    border: 1px solid #ddd;
+}
+
+th, td {
+    padding: 10px;
+    text-align: center;
+}
+
+th {
+    background-color: #007bff;
+    color: white;
+}
+
+a, button {
+    text-decoration: none;
+    color: white;
+    background-color: #007bff;
+    padding: 8px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+a:hover, button:hover {
+    background-color: #0056b3;
+}
+
+.flash {
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 5px;
+}
+
+.flash.success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.flash.danger {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.flash.info {
+    background-color: #cce5ff;
+    color: #004085;
+}
+
+form {
+    margin-top: 15px;
+    text-align: center;
+}
+
+input[type="text"], input[type="password"] {
+    padding: 8px;
+    width: 60%;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}

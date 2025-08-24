@@ -1,33 +1,25 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Admin Login · Election Server</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <title>Admin Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="center">
-  <div class="card" style="max-width: 420px; width: 100%;">
-    <div class="header">
-      <h2>Admin Login</h2>
-      <a class="btn" href="{{ url_for('home') }}">Home</a>
-    </div>
+<body>
+<header>
+    <h1>Admin Login</h1>
+</header>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for cat, msg in messages %}
-          <div class="flash">{{ msg }}</div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
+<div class="container">
+    {% if error %}
+        <div class="flash danger">{{ error }}</div>
+    {% endif %}
 
-    <form method="post">
-      <label class="small">Password</label>
-      <input class="password" type="password" name="password" placeholder="Enter admin password" required>
-      <div class="footer-actions">
-        <button class="btn btn-success" type="submit">Login</button>
-      </div>
+    <form method="POST">
+        <input type="text" name="username" placeholder="Username" required><br>
+        <input type="password" name="password" placeholder="Password" required><br>
+        <button type="submit">Login</button>
     </form>
-  </div>
+</div>
 </body>
 </html>

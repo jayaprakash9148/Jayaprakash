@@ -1,29 +1,20 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Stats · Election Server</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <title>Voting Stats</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="center">
-  <div class="card" style="max-width: 520px; width: 100%;">
-    <div class="header">
-      <h2>Live Stats</h2>
-      <a class="btn" href="{{ url_for('home') }}">Home</a>
-    </div>
-    <p>Total registered voters: <strong>{{ total }}</strong></p>
-    <p>Votes cast: <strong>{{ voted }}</strong></p>
-    <p>Not yet voted: <strong>{{ total - voted }}</strong></p>
+<body>
+<header>
+    <h1>Voting Statistics</h1>
+</header>
 
-    {% if session.get('admin') %}
-      <div class="footer-actions">
-        <a class="btn" href="{{ url_for('voters') }}">Manage Voters</a>
-        <a class="btn btn-danger" href="{{ url_for('logout') }}">Logout</a>
-      </div>
-    {% else %}
-      <p class="small">Admin? <a class="btn" href="{{ url_for('login') }}">Login</a></p>
-    {% endif %}
-  </div>
+<div class="container">
+    <p>Total Voters: {{ total }}</p>
+    <p>Voted: {{ voted }}</p>
+    <p>Not Voted: {{ not_voted }}</p>
+    <a href="{{ url_for('index') }}">Back to Dashboard</a>
+</div>
 </body>
 </html>
