@@ -13,7 +13,7 @@ app.secret_key = "supersecretkey_change_this"  # change before production
 
 DB_FILE = "voters.db"
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "changeme"  # change to your strong password
+ADMIN_PASSWORD = "12345"  # change to your strong password
 
 # -------------------------
 # DB helpers
