@@ -1,304 +1,322 @@
 :root{
-    --bg1:#0a1030;
-    --bg2:#1c2a6a;
-    --card:rgba(14,18,43,0.85);
-    --border:rgba(255,255,255,0.18);
-    --text:#f5f7ff;
-    --muted:#c9cce0;
-    --accent:#00d5ff;
-    --success:#2ecc71;
-    --danger:#ff4d4f;
-    --warning:#ffb703;
+  --bg1:#0a1030;
+  --bg2:#1c2a6a;
+  --card:rgba(14,18,43,0.9);
+  --border:rgba(255,255,255,0.3);
+  --text:#f5f7ff;
+  --muted:#c9cce0;
+  --accent:#00d5ff;
+  --success:#2ecc71;
+  --danger:#ff4d4f;
+  --warning:#ffb703;
 }
 
 /* === Base & Body === */
-body, html {  
-    margin: 0;  
-    padding: 0;  
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;  
-    background: linear-gradient(135deg, var(--bg1), var(--bg2));  
-    color: var(--text);  
-    min-height: 100vh;  
+body, html {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, var(--bg1), var(--bg2));
+    color: var(--text);
+    min-height: 100vh;
 }
 
-.bg {  
-    display: flex;  
-    justify-content: center;  
-    align-items: center;  
-    padding: 20px;  
+/* Background container */
+.bg {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
 }
 
 /* === Center Card === */
-.center {  
-    width: 100%;  
-    max-width: 900px;  
-    display: flex;  
-    justify-content: center;  
-    align-items: center;  
+.center {
+    width: 100%;
+    max-width: 900px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
-.card-3d {  
-    background: var(--card);  
-    padding: 30px;  
-    border-radius: 20px;  
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 6px 10px rgba(0,0,0,0.3);  
-    backdrop-filter: blur(8px);  
-    width: 100%;  
-    color: var(--text); /* Ensure all text inside card is visible */
+.card-3d {
+    background: var(--card);
+    padding: 30px;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 6px 10px rgba(0,0,0,0.3);
+    backdrop-filter: blur(8px);
+    width: 100%;
+    color: var(--text);
+    transform-style: preserve-3d;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* === Titles & Text === */
-h1, h2, h3, h4 {  
-    margin: 0 0 15px;  
-    font-weight: 600;  
-    text-align: center;  
+h1, h2, h3, h4 {
+    margin: 0 0 15px;
+    font-weight: 600;
+    text-align: center;
     color: var(--text);
 }
 
-.center-text {  
-    text-align: center;  
-}  
-
-.muted {  
-    color: var(--muted);  
-}  
-
-.small {  
-    font-size: 0.85rem;  
-}  
-
-.mt-2 {  
-    margin-top: 10px;  
-}  
-
-/* === Forms & Inputs === */
-form.stack {  
-    display: flex;  
-    flex-direction: column;  
-    gap: 15px;  
+.center-text {
+    text-align: center;
 }
 
-.input {  
-    padding: 12px 15px;  
-    border-radius: 10px;  
-    border: 1px solid var(--border);  
-    background: rgba(255,255,255,0.08); /* slightly more visible */  
-    color: var(--text);  
-    font-size: 1rem;  
-    outline: none;  
-    transition: 0.3s;  
+.muted {
+    color: var(--muted);
+}
+
+.small {
+    font-size: 0.85rem;
+}
+
+.mt-2 {
+    margin-top: 10px;
+}
+
+/* === Forms & Inputs === */
+form.stack {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.input {
+    padding: 12px 15px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.08);
+    color: var(--text);
+    font-size: 1rem;
+    outline: none;
+    transition: 0.3s;
 }
 
 .input::placeholder {
     color: #e0e0e0;
-    opacity: 1;
 }
 
-.input:focus {  
-    border-color: var(--accent);  
-    box-shadow: 0 0 10px rgba(0,213,255,0.5);  
+.input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 10px rgba(0,213,255,0.5);
 }
 
 /* === Buttons === */
-.btn {  
-    padding: 10px 20px;  
-    border-radius: 12px;  
-    font-size: 1rem;  
-    border: none;  
-    cursor: pointer;  
-    transition: all 0.3s;  
-    text-decoration: none;  
-    display: inline-block;  
+.btn {
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-size: 1rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-decoration: none;
+    display: inline-block;
 }
 
-.btn.primary {  
-    background: var(--accent);  
-    color: #000;  
+.btn.primary {
+    background: var(--accent);
+    color: #000;
 }
 
-.btn.subtle {  
-    background: rgba(255,255,255,0.1);  
-    color: var(--text);  
+.btn.subtle {
+    background: rgba(255,255,255,0.1);
+    color: var(--text);
 }
 
-.btn.danger {  
-    background: var(--danger);  
-    color: #fff;  
+.btn.danger {
+    background: var(--danger);
+    color: #fff;
 }
 
-.btn:hover {  
-    transform: translateY(-2px);  
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);  
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
 }
 
-.row-gap {  
-    display: flex;  
-    gap: 10px;  
-    flex-wrap: wrap;  
+/* === Row Gap for multiple buttons === */
+.row-gap {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 
-.inline-reset, .inline-delete {  
-    display: flex;  
-    flex-direction: column;  
+.inline-reset, .inline-delete {
+    display: flex;
+    flex-direction: column;
 }
 
-.hidden {  
-    display: none;  
+.hidden {
+    display: none;
 }
 
 /* === Flash Messages === */
-.flash {  
-    padding: 10px 15px;  
-    border-radius: 10px;  
-    margin-bottom: 15px;  
+.flash {
+    padding: 10px 15px;
+    border-radius: 10px;
+    margin-bottom: 15px;
     color: var(--text);
 }
 
-.flash.success {  
-    background: var(--success);  
-    color: #000;  
+.flash.success {
+    background: var(--success);
+    color: #000;
 }
 
-.flash.danger {  
-    background: var(--danger);  
-    color: #fff;  
+.flash.danger {
+    background: var(--danger);
+    color: #fff;
 }
 
 /* === Tables === */
-.table-wrap {  
-    overflow-x: auto;  
-    margin-top: 20px;  
+.table-wrap {
+    overflow-x: auto;
+    margin-top: 20px;
 }
 
-table {  
-    width: 100%;  
-    border-collapse: collapse;  
-    background: rgba(255,255,255,0.08);  
-    border-radius: 15px;  
-    overflow: hidden;  
-    color: var(--text);  
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(255,255,255,0.08);
+    border-radius: 15px;
+    overflow: hidden;
+    color: var(--text);
 }
 
-thead {  
-    background: rgba(255,255,255,0.12);  
-    color: var(--text);  
+thead {
+    background: rgba(255,255,255,0.15);
 }
 
-th, td {  
-    padding: 12px 15px;  
-    text-align: left;  
-    border-bottom: 1px solid var(--border);  
+th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
 }
 
-td.mono {  
-    font-family: monospace;  
-    font-size: 0.9rem;  
+td.mono {
+    font-family: monospace;
+    font-size: 0.9rem;
 }
 
-tr:hover {  
-    background: rgba(255,255,255,0.1);  
+tr:hover {
+    background: rgba(255,255,255,0.1);
 }
 
 /* === Badges === */
-.badge {  
-    padding: 4px 10px;  
-    border-radius: 12px;  
-    font-size: 0.8rem;  
-    text-align: center;  
-    color: #fff;  
-}  
+.badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    text-align: center;
+    color: #fff;
+}
 
-.badge.yes {  
-    background: var(--success);  
-}  
+.badge.yes {
+    background: var(--success);
+}
 
-.badge.no {  
-    background: var(--danger);  
-}  
+.badge.no {
+    background: var(--danger);
+}
 
 /* === Stats Cards === */
-.stats {  
-    display: flex;  
-    gap: 15px;  
-    flex-wrap: wrap;  
-    margin-top: 20px;  
-    justify-content: center;  
-}  
+.stats {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+    justify-content: center;
+}
 
-.stat {  
-    flex: 1 1 150px;  
-    background: rgba(255,255,255,0.08);  
-    border-radius: 20px;  
-    text-align: center;  
-    padding: 20px;  
-    box-shadow: 0 5px 15px rgba(0,0,0,0.3);  
-    transition: 0.3s;  
-    color: var(--text);
-}  
+.stat {
+    flex: 1 1 150px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 20px;
+    text-align: center;
+    padding: 20px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    transition: 0.3s;
+}
 
-.stat:hover {  
-    transform: translateY(-5px);  
-}  
+.stat:hover {
+    transform: translateY(-5px);
+}
 
-.stat-title {  
-    font-size: 0.85rem;  
-    color: var(--muted);  
-    margin-bottom: 10px;  
-}  
+.stat-title {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 10px;
+}
 
-.stat-value {  
-    font-size: 1.8rem;  
-    font-weight: 600;  
-}  
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 600;
+}
 
 /* === Header === */
-.header {  
-    display: flex;  
-    justify-content: space-between;  
-    align-items: center;  
-    flex-wrap: wrap;  
-    margin-bottom: 20px;  
-}  
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
 
 /* === Grid Buttons === */
-.grid {  
-    display: grid;  
-    grid-template-columns: repeat(auto-fit,minmax(140px,1fr));  
-    gap: 15px;  
-    margin-top: 20px;  
-}  
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(140px,1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+/* === Excel/CSV buttons for voter list === */
+.export-btn {
+    padding: 10px 15px;
+    border-radius: 10px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #000;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.export-btn:hover {
+    background: rgba(0,213,255,0.6);
+}
+
+/* === Labels & Actions === */
+.label {
+    font-weight: 500;
+    margin-bottom: 5px;
+}
+
+.actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+}
+
+.mono {
+    font-family: monospace;
+}
 
 /* === Responsive Adjustments === */
-@media(max-width:768px){  
-    .card-3d {  
-        padding: 20px;  
-        border-radius: 15px;  
-    }  
-    table, th, td {  
-        font-size: 0.85rem;  
-    }  
-    .stats {  
-        flex-direction: column;  
-        align-items: center;  
-    }  
-    .grid {  
-        grid-template-columns: 1fr 1fr;  
-    }  
-}  
-
-/* === Misc === */
-.label {  
-    font-weight: 500;  
-    margin-bottom: 5px;  
-}  
-
-.actions {  
-    display: flex;  
-    gap: 10px;  
-    flex-wrap: wrap;  
-    margin-bottom: 15px;  
-}  
-
-.mono {  
-    font-family: monospace;  
+@media(max-width:768px){
+    .card-3d {
+        padding: 20px;
+        border-radius: 15px;
+    }
+    table, th, td {
+        font-size: 0.85rem;
+    }
+    .stats {
+        flex-direction: column;
+        align-items: center;
+    }
+    .grid {
+        grid-template-columns: 1fr 1fr;
+    }
 }
