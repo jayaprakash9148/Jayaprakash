@@ -1,11 +1,32 @@
 {% extends "base.html" %}
+{% block title %}Add Voter{% endblock %}
 {% block content %}
-<h2>Add New Voter</h2>
-<form method="POST">
-    <label>Name</label>
-    <input type="text" name="name" placeholder="Enter voter name" required>
-    <label>Fingerprint Template</label>
-    <input type="text" name="fingerprint_template" placeholder="Enter fingerprint template" required>
-    <button type="submit" class="btn-primary">Add Voter</button>
+<h2 class="title">Add New Voter</h2>
+<div class="actions">
+<a class="btn subtle" href="{{ url_for('voters') }}">👥 Voters List</a>
+<a class="btn subtle" href="{{ url_for('index') }}">🏠 Dashboard</a>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+  {% for cat, msg in messages %}
+    <div class="flash {{ cat }}">{{ msg }}</div>
+  {% endfor %}
+{% endif %}
+{% endwith %}
+
+<form method="post" class="stack">
+<label class="label">Name</label>
+<input class="input" type="text" name="name" placeholder="Full name" required>
+
+<label class="label">Fingerprint Template</label>
+<textarea class="input" name="fingerprint_template" placeholder="Paste captured template string" rows="4" required></textarea>
+
+<div class="muted small">Tip: For testing use simple text like <b>FP_ABC_001</b></div>
+
+<div class="row-gap">
+<button class="btn primary" type="submit">Add Voter</button>
+<a class="btn subtle" href="{{ url_for('voters') }}">Cancel</a>
+</div>
 </form>
 {% endblock %}

@@ -1,98 +1,280 @@
-body {
-    font-family: Arial, sans-serif;
-    background: linear-gradient(to right, #74ebd5, #acb6e5);
+/* === Base & Body === */
+body, html {
     margin: 0;
     padding: 0;
-    color: #333;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #0a1030, #1c2a6a);
+    color: var(--text);
+    min-height: 100vh;
 }
 
-.navbar {
-    background: rgba(0,0,0,0.7);
-    padding: 10px 20px;
+.bg {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
-}
-
-.navbar a {
-    color: #fff;
-    margin-left: 15px;
-    text-decoration: none;
-    font-weight: bold;
-}
-
-.logout-btn {
-    color: #ff8080;
-}
-
-.container {
     padding: 20px;
 }
 
-.login-box, form {
-    background: rgba(255,255,255,0.85);
-    padding: 30px;
-    border-radius: 10px;
-    max-width: 400px;
-    margin: 50px auto;
-    box-shadow: 0 0 15px rgba(0,0,0,0.3);
-}
-
-input[type=text], input[type=password] {
+/* === Center Card === */
+.center {
     width: 100%;
-    padding: 8px;
-    margin: 10px 0 20px 0;
-    border-radius: 5px;
-    border: 1px solid #ccc;
+    max-width: 900px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
-button, .btn-primary, .btn-secondary, .btn-danger, .btn-warning {
-    padding: 10px 15px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
+.card-3d {
+    background: var(--card);
+    padding: 30px;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 6px 10px rgba(0,0,0,0.3);
+    backdrop-filter: blur(8px);
+    width: 100%;
+}
+
+/* === Titles & Text === */
+h1, h2, h3, h4 {
+    margin: 0 0 15px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.center-text {
+    text-align: center;
+}
+
+.muted {
+    color: var(--muted);
+}
+
+.small {
+    font-size: 0.85rem;
+}
+
+.mt-2 {
     margin-top: 10px;
-    font-weight: bold;
 }
 
-.btn-primary { background-color: #4CAF50; color: white; }
-.btn-secondary { background-color: #2196F3; color: white; }
-.btn-danger { background-color: #f44336; color: white; }
-.btn-warning { background-color: #ff9800; color: white; }
+/* === Forms & Inputs === */
+form.stack {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.input {
+    padding: 12px 15px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.05);
+    color: var(--text);
+    font-size: 1rem;
+    outline: none;
+    transition: 0.3s;
+}
+
+.input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 10px rgba(0,213,255,0.5);
+}
+
+/* === Buttons === */
+.btn {
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-size: 1rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn.primary {
+    background: var(--accent);
+    color: #000;
+}
+
+.btn.subtle {
+    background: rgba(255,255,255,0.1);
+    color: var(--text);
+}
+
+.btn.danger {
+    background: var(--danger);
+    color: #fff;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.row-gap {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.inline-reset, .inline-delete {
+    display: flex;
+    flex-direction: column;
+}
+
+.hidden {
+    display: none;
+}
+
+/* === Flash Messages === */
+.flash {
+    padding: 10px 15px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+}
+
+.flash.success {
+    background: var(--success);
+    color: #000;
+}
+
+.flash.danger {
+    background: var(--danger);
+    color: #fff;
+}
+
+/* === Tables === */
+.table-wrap {
+    overflow-x: auto;
+    margin-top: 20px;
+}
 
 table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 20px;
-    background: rgba(255,255,255,0.9);
+    background: rgba(255,255,255,0.05);
+    border-radius: 15px;
+    overflow: hidden;
 }
 
-table th, table td {
-    padding: 10px;
-    border: 1px solid #ccc;
+thead {
+    background: rgba(255,255,255,0.1);
+}
+
+th, td {
+    padding: 12px 15px;
     text-align: left;
+    border-bottom: 1px solid var(--border);
 }
 
-.alert {
-    padding: 10px;
-    border-radius: 5px;
-    margin-bottom: 15px;
+td.mono {
+    font-family: monospace;
+    font-size: 0.9rem;
 }
 
-.alert.success { background-color: #4CAF50; color: white; }
-.alert.danger { background-color: #f44336; color: white; }
-.alert.info { background-color: #2196F3; color: white; }
+tr:hover {
+    background: rgba(255,255,255,0.08);
+}
 
-.stats-box {
+/* === Badges === */
+.badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    color: #fff;
+    text-align: center;
+}
+
+.badge.yes {
+    background: var(--success);
+}
+
+.badge.no {
+    background: var(--danger);
+}
+
+/* === Stats Cards === */
+.stats {
     display: flex;
-    gap: 20px;
+    gap: 15px;
+    flex-wrap: wrap;
     margin-top: 20px;
+    justify-content: center;
 }
 
 .stat {
-    flex: 1;
-    background: rgba(255,255,255,0.85);
-    padding: 20px;
-    border-radius: 10px;
+    flex: 1 1 150px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 20px;
     text-align: center;
+    padding: 20px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    transition: 0.3s;
+}
+
+.stat:hover {
+    transform: translateY(-5px);
+}
+
+.stat-title {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 10px;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 600;
+}
+
+/* === Header === */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+/* === Grid Buttons === */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(140px,1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+/* === Responsive Adjustments === */
+@media(max-width:768px){
+    .card-3d {
+        padding: 20px;
+        border-radius: 15px;
+    }
+    table, th, td {
+        font-size: 0.85rem;
+    }
+    .stats {
+        flex-direction: column;
+        align-items: center;
+    }
+    .grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* === Misc === */
+.label {
+    font-weight: 500;
+    margin-bottom: 5px;
+}
+
+.actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+}
+
+.mono {
+    font-family: monospace;
 }

@@ -1,16 +1,23 @@
 {% extends "base.html" %}
+{% block title %}Admin Login{% endblock %}
 {% block content %}
-<div class="login-box">
-    <h2>Admin Login</h2>
-    {% if error %}
-    <div class="alert danger">{{ error }}</div>
-    {% endif %}
-    <form method="POST">
-        <label>Username</label>
-        <input type="text" name="username" placeholder="Enter username" required>
-        <label>Password</label>
-        <input type="password" name="password" placeholder="Enter password" required>
-        <button type="submit" class="btn-primary">Login</button>
-    </form>
-</div>
+<h1 class="title center-text">Admin Login</h1>
+
+{% if error %}
+<div class="flash danger">{{ error }}</div>
+{% endif %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+  {% for cat, msg in messages %}
+  <div class="flash {{ cat }}">{{ msg }}</div>
+  {% endfor %}
+{% endif %}
+{% endwith %}
+
+<form method="post" class="stack login-form">
+  <input class="input" type="text" name="username" placeholder="Username" required>
+  <input class="input" type="password" name="password" placeholder="Password" required>
+  <button class="btn primary" type="submit">Login</button>
+</form>
+<div class="muted mt-2 center-text">Tip: Default admin/admin123 (change in app.py)</div>
 {% endblock %}

@@ -1,39 +1,65 @@
 {% extends "base.html" %}
+{% block title %}Voters List{% endblock %}
 {% block content %}
-<h2>Voters List</h2>
-<table>
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Fingerprint Template</th>
-            <th>Voted</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for voter in voters %}
-        <tr>
-            <td>{{ voter.id }}</td>
-            <td>{{ voter.name }}</td>
-            <td>{{ voter.fingerprint_template }}</td>
-            <td>{{ "Yes" if voter.has_voted else "No" }}</td>
-            <td>
-                <form method="POST" action="{{ url_for('delete_voter', voter_id=voter.id) }}" onsubmit="return confirm('Are you sure?');">
-                    <input type="password" name="admin_password" placeholder="Admin Password" required>
-                    <button type="submit" class="btn-danger">Delete</button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-<div class="download-links">
-    <a href="{{ url_for('download_excel') }}" class="btn-primary">Export Excel</a>
-    <a href="{{ url_for('download_csv') }}" class="btn-secondary">Export CSV</a>
+<div class="header">
+<h2 class="title">Voters Management</h2>
+<div class="actions">
+  <a class="btn" href="{{ url_for('add_voter') }}">➕ Add Voter</a>
+  <a class="btn" href="{{ url_for('download_excel') }}">⬇️ Excel</a>
+  <a class="btn" href="{{ url_for('download_csv') }}">⬇️ CSV</a>
+  <a class="btn subtle" href="{{ url_for('index') }}">🏠 Dashboard</a>
+  <a class="btn subtle" href="{{ url_for('logout') }}">Logout</a>
 </div>
-<form method="POST" action="{{ url_for('reset_votes') }}" onsubmit="return confirm('Reset all votes?');">
-    <input type="password" name="admin_password" placeholder="Admin Password" required>
-    <button type="submit" class="btn-warning">Reset All Votes</button>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+  {% for cat, msg in messages %}
+    <div class="flash {{ cat }}">{{ msg }}</div>
+  {% endfor %}
+{% endif %}
+{% endwith %}
+
+<form method="post" action="{{ url_for('reset_votes') }}" class="inline-reset" onsubmit="return confirm('Reset all votes?');">
+<div class="row-gap">
+  <button type="button" class="btn danger" id="resetRevealBtn" onclick="showResetPassword()">🔄 Reset Votes</button>
+  <div id="resetPwdWrap" class="hidden">
+    <input class="input small" type="password" name="admin_password" id="resetPwd" placeholder="Admin password">
+    <button class="btn danger" type="submit">Confirm Reset</button>
+    <button class="btn subtle" type="button" onclick="hideResetPassword()">Cancel</button>
+  </div>
+</div>
 </form>
+
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>ID</th><th>Name</th><th>Fingerprint Template</th><th>Voted</th><th>Actions</th>
+</tr>
+</thead>
+<tbody>
+{% for v in voters %}
+<tr>
+<td>{{ v["id"] }}</td>
+<td>{{ v["name"] }}</td>
+<td class="mono">{{ v["fingerprint_template"] }}</td>
+<td>{% if v["has_voted"] %}<span class="badge yes">Yes</span>{% else %}<span class="badge no">No</span>{% endif %}</td>
+<td>
+<form method="post" action="{{ url_for('delete_voter', voter_id=v['id']) }}" class="inline-delete" onsubmit="return confirm('Delete voter #{{ v['id'] }}?');">
+<div id="del-wrap-{{ v['id'] }}">
+<button type="button" class="btn danger" onclick="revealDeletePwd({{ v['id'] }})">🗑 Delete</button>
+</div>
+<div id="del-confirm-{{ v['id'] }}" class="hidden">
+<input class="input small" type="password" name="admin_password" placeholder="Admin password" required>
+<button class="btn danger" type="submit">Confirm</button>
+<button class="btn subtle" type="button" onclick="cancelDelete({{ v['id'] }})">Cancel</button>
+</div>
+</form>
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
 {% endblock %}

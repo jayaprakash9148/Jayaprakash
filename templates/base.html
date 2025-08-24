@@ -1,33 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title or "Voting System" }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Election System{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
-    <nav class="navbar">
-        <a href="{{ url_for('index') }}" class="nav-brand">Voting System</a>
-        {% if session.get('admin') %}
-        <div class="nav-links">
-            <a href="{{ url_for('voters') }}">Voters List</a>
-            <a href="{{ url_for('stats') }}">Stats</a>
-            <a href="{{ url_for('add_voter') }}">Add Voter</a>
-            <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
-        </div>
-        {% endif %}
-    </nav>
-
-    <div class="container">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert {{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        {% block content %}{% endblock %}
-    </div>
+<body class="bg">
+<div class="center">
+  <div class="card-3d">
+    {% block content %}{% endblock %}
+  </div>
+</div>
+<script>
+  function showResetPassword() {
+    document.getElementById('resetRevealBtn').classList.add('hidden');
+    document.getElementById('resetPwdWrap').classList.remove('hidden');
+    document.getElementById('resetPwd').focus();
+  }
+  function hideResetPassword() {
+    document.getElementById('resetPwdWrap').classList.add('hidden');
+    document.getElementById('resetRevealBtn').classList.remove('hidden');
+  }
+  function revealDeletePwd(id) {
+    document.getElementById('del-wrap-' + id).classList.add('hidden');
+    document.getElementById('del-confirm-' + id).classList.remove('hidden');
+  }
+  function cancelDelete(id) {
+    document.getElementById('del-confirm-' + id).classList.add('hidden');
+    document.getElementById('del-wrap-' + id).classList.remove('hidden');
+  }
+</script>
 </body>
 </html>
