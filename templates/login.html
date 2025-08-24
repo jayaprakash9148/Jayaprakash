@@ -1,35 +1,23 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Admin Login</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<body class="bg">
-  <div class="center">
-    <div class="card narrow animated-card">
-      <h1 class="title animated-title">Admin Login</h1>
+{% extends "base.html" %}
+{% block title %}Admin Login{% endblock %}
+{% block content %}
+<h1 class="title center-text">Admin Login</h1>
 
-      {% if error %}
-        <div class="flash danger">{{ error }}</div>
-      {% endif %}
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for cat, msg in messages %}
-            <div class="flash {{ cat }}">{{ msg }}</div>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
+{% if error %}
+<div class="flash danger">{{ error }}</div>
+{% endif %}
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+  {% for cat, msg in messages %}
+  <div class="flash {{ cat }}">{{ msg }}</div>
+  {% endfor %}
+{% endif %}
+{% endwith %}
 
-      <form method="post" class="stack animated-form">
-        <input class="input" type="text" name="username" placeholder="Username" required>
-        <input class="input" type="password" name="password" placeholder="Password" required>
-        <button class="btn primary animated-btn" type="submit">Login</button>
-      </form>
-
-      <div class="muted mt-2">Tip: Default admin/admin123 (change in app.py)</div>
-    </div>
-  </div>
-</body>
-</html>
+<form method="post" class="stack login-form">
+  <input class="input" type="text" name="username" placeholder="Username" required>
+  <input class="input" type="password" name="password" placeholder="Password" required>
+  <button class="btn primary" type="submit">Login</button>
+</form>
+<div class="muted mt-2 center-text">Tip: Default admin/admin123 (change in app.py)</div>
+{% endblock %}
