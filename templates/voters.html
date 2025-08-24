@@ -28,7 +28,6 @@
         {% endif %}
       {% endwith %}
 
-      <!-- Reset Votes (inline password revealed on first click) -->
       <form method="post" action="{{ url_for('reset_votes') }}" class="inline-reset" onsubmit="return confirm('Reset all votes?');">
         <div class="row-gap">
           <button type="button" class="btn danger" id="resetRevealBtn" onclick="showResetPassword()">🔄 Reset Votes</button>
@@ -61,7 +60,6 @@
                 {% if v["has_voted"] %}<span class="badge yes">Yes</span>{% else %}<span class="badge no">No</span>{% endif %}
               </td>
               <td>
-                <!-- Delete (inline password appears when clicking "Delete") -->
                 <form method="post" action="{{ url_for('delete_voter', voter_id=v['id']) }}" class="inline-delete" onsubmit="return confirm('Delete voter #{{ v['id'] }}?');">
                   <div id="del-wrap-{{ v['id'] }}">
                     <button type="button" class="btn danger" onclick="revealDeletePwd({{ v['id'] }})">🗑 Delete</button>
@@ -78,7 +76,6 @@
           </tbody>
         </table>
       </div>
-
     </div>
   </div>
 

@@ -10,11 +10,8 @@
   <div class="center">
     <div class="card narrow">
       <div class="header">
-        <h2 class="title">Add New Voter</h2>
-        <div class="actions">
-          <a class="btn subtle" href="{{ url_for('voters') }}">👥 Voters List</a>
-          <a class="btn subtle" href="{{ url_for('index') }}">🏠 Dashboard</a>
-        </div>
+        <h1 class="title">Add New Voter</h1>
+        <a class="btn subtle" href="{{ url_for('voters') }}">🏠 Back to Voters</a>
       </div>
 
       {% with messages = get_flashed_messages(with_categories=true) %}
@@ -26,18 +23,14 @@
       {% endwith %}
 
       <form method="post" class="stack">
-        <label class="label">Name</label>
-        <input class="input" type="text" name="name" placeholder="Full name" required>
-
-        <label class="label">Fingerprint Template (raw or serialized text)</label>
-        <textarea class="input" name="fingerprint_template" placeholder="Paste captured template string" rows="4" required></textarea>
-
-        <div class="muted small">Tip: For testing use simple text like <b>FP_ABC_001</b> and send the same from ESP.</div>
-
-        <div class="row-gap">
-          <button class="btn primary" type="submit">Add Voter</button>
-          <a class="btn subtle" href="{{ url_for('voters') }}">Cancel</a>
-        </div>
+        <input class="input" type="text" name="name" placeholder="Voter Name" required>
+        <input class="input" type="text" name="fingerprint_template" placeholder="Fingerprint Template" required>
+        <select class="input" name="gender" required>
+          <option value="" disabled selected>Select Gender</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+        </select>
+        <button class="btn primary" type="submit">Add Voter</button>
       </form>
     </div>
   </div>
