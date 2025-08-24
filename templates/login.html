@@ -1,9 +1,16 @@
 {% extends "base.html" %}
 {% block content %}
-<form method="post" class="stack">
-  <input class="input" type="text" name="username" placeholder="Username" required>
-  <input class="input" type="password" name="password" placeholder="Password" required>
-  <button class="btn primary" type="submit">Login</button>
-</form>
-<div class="muted mt-2">Tip: Set a strong admin password in app.py</div>
+<div class="login-box">
+    <h2>Admin Login</h2>
+    {% if error %}
+    <div class="alert danger">{{ error }}</div>
+    {% endif %}
+    <form method="POST">
+        <label>Username</label>
+        <input type="text" name="username" placeholder="Enter username" required>
+        <label>Password</label>
+        <input type="password" name="password" placeholder="Enter password" required>
+        <button type="submit" class="btn-primary">Login</button>
+    </form>
+</div>
 {% endblock %}

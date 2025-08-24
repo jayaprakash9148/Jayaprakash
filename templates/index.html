@@ -1,18 +1,24 @@
 {% extends "base.html" %}
 {% block content %}
-{% if session.get('admin') %}
-<div class="grid">
-  <a class="btn block" href="{{ url_for('voters') }}">👥 Voters List</a>
-  <a class="btn block" href="{{ url_for('add_voter') }}">➕ Add Voter</a>
-  <a class="btn block" href="{{ url_for('stats') }}">📊 Live Stats</a>
-  <a class="btn block" href="{{ url_for('download_excel') }}">⬇️ Download Excel</a>
-  <a class="btn block" href="{{ url_for('download_csv') }}">⬇️ Download CSV</a>
+<div class="dashboard">
+    <h1>Welcome {{ 'Admin' if admin else 'Guest' }}</h1>
+    {% if admin %}
+    <div class="stats-box">
+        <div class="stat">
+            <h3>Total Voters</h3>
+            <p>{{ total }}</p>
+        </div>
+        <div class="stat">
+            <h3>Voted</h3>
+            <p>{{ voted }}</p>
+        </div>
+        <div class="stat">
+            <h3>Not Voted</h3>
+            <p>{{ total - voted }}</p>
+        </div>
+    </div>
+    {% else %}
+    <p>Please login to manage voters and view statistics.</p>
+    {% endif %}
 </div>
-<div class="muted mt-2">
-  Total: <b>{{ total }}</b> &nbsp;|&nbsp; Voted: <b>{{ voted }}</b> &nbsp;|&nbsp; Not voted: <b>{{ total - voted }}</b>
-</div>
-{% else %}
-<div class="muted">Please login to manage voters or view stats.</div>
-<a class="btn primary mt-2" href="{{ url_for('login') }}">Admin Login</a>
-{% endif %}
 {% endblock %}

@@ -1,36 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>{{ title or "Election Voting System" }}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title or "Voting System" }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body class="bg">
-  <div class="center">
-    <div class="card {{ card_class or '' }}">
-      {% if title %}
-      <div class="header">
-        <h1 class="title">{{ title }}</h1>
+<body>
+    <nav class="navbar">
+        <a href="{{ url_for('index') }}" class="nav-brand">Voting System</a>
         {% if session.get('admin') %}
-          <div class="actions">
-            <a class="btn subtle" href="{{ url_for('index') }}">🏠 Dashboard</a>
-            <a class="btn subtle" href="{{ url_for('logout') }}">Logout</a>
-          </div>
+        <div class="nav-links">
+            <a href="{{ url_for('voters') }}">Voters List</a>
+            <a href="{{ url_for('stats') }}">Stats</a>
+            <a href="{{ url_for('add_voter') }}">Add Voter</a>
+            <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+        </div>
         {% endif %}
-      </div>
-      {% endif %}
+    </nav>
 
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for cat, msg in messages %}
-            <div class="flash {{ cat }}">{{ msg }}</div>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
-
-      {% block content %}{% endblock %}
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
     </div>
-  </div>
 </body>
 </html>

@@ -1,38 +1,11 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Add Voter</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<body class="bg">
-  <div class="center">
-    <div class="card narrow">
-      <div class="header">
-        <h1 class="title">Add New Voter</h1>
-        <a class="btn subtle" href="{{ url_for('voters') }}">🏠 Back to Voters</a>
-      </div>
-
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for cat, msg in messages %}
-            <div class="flash {{ cat }}">{{ msg }}</div>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
-
-      <form method="post" class="stack">
-        <input class="input" type="text" name="name" placeholder="Voter Name" required>
-        <input class="input" type="text" name="fingerprint_template" placeholder="Fingerprint Template" required>
-        <select class="input" name="gender" required>
-          <option value="" disabled selected>Select Gender</option>
-          <option value="Male">Male</option>
-          <option value="Female">Female</option>
-        </select>
-        <button class="btn primary" type="submit">Add Voter</button>
-      </form>
-    </div>
-  </div>
-</body>
-</html>
+{% extends "base.html" %}
+{% block content %}
+<h2>Add New Voter</h2>
+<form method="POST">
+    <label>Name</label>
+    <input type="text" name="name" placeholder="Enter voter name" required>
+    <label>Fingerprint Template</label>
+    <input type="text" name="fingerprint_template" placeholder="Enter fingerprint template" required>
+    <button type="submit" class="btn-primary">Add Voter</button>
+</form>
+{% endblock %}

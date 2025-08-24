@@ -1,24 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="stats">
-  <div class="stat">
-    <div class="stat-title">Total registered voters</div>
-    <div class="stat-value">{{ total }}</div>
-  </div>
-  <div class="stat">
-    <div class="stat-title">Votes cast</div>
-    <div class="stat-value">{{ voted }}</div>
-  </div>
-  <div class="stat">
-    <div class="stat-title">Not yet voted</div>
-    <div class="stat-value">{{ not_voted }}</div>
-  </div>
+<h2>Voting Statistics</h2>
+<div class="stats-box">
+    <div class="stat">
+        <h3>Total Voters</h3>
+        <p>{{ total }}</p>
+    </div>
+    <div class="stat">
+        <h3>Voted</h3>
+        <p>{{ voted }}</p>
+    </div>
+    <div class="stat">
+        <h3>Not Voted</h3>
+        <p>{{ not_voted }}</p>
+    </div>
 </div>
-
-{% if session.get('admin') %}
-<div class="row-gap mt-2">
-  <a class="btn" href="{{ url_for('download_excel') }}">⬇️ Download Excel</a>
-  <a class="btn" href="{{ url_for('download_csv') }}">⬇️ Download CSV</a>
-</div>
-{% endif %}
 {% endblock %}

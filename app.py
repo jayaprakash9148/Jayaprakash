@@ -9,14 +9,14 @@ from openpyxl import Workbook
 import csv
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey_change_this"  # change before production
+app.secret_key = "supersecretkey_change_this"  # Change before production
 
 DB_FILE = "voters.db"
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "12345"  # change to your strong password
+ADMIN_PASSWORD = "admin123"  # Change to a strong password
 
 # -------------------------
-# DB helpers
+# Database helpers
 # -------------------------
 def get_db_connection():
     conn = sqlite3.connect(DB_FILE)
@@ -24,7 +24,7 @@ def get_db_connection():
     return conn
 
 def init_db():
-    """Create voters table if missing."""
+    """Create voters table if missing (persistent, no seeding)."""
     conn = get_db_connection()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS voters (
@@ -41,8 +41,19 @@ def init_db():
 init_db()
 
 # -------------------------
-# Pages
+# Routes
 # -------------------------
+
+# Login required decorator
+def admin_required(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("admin"):
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
 @app.route("/")
 def index():
     admin = session.get("admin", False)
@@ -58,12 +69,12 @@ def index():
 def login():
     error = None
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "").strip()
+        username = request.form.get("username", "")
+        password = request.form.get("password", "")
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             session["admin"] = True
             flash("✅ Logged in as admin.", "success")
-            return redirect(url_for("voters"))
+            return redirect(url_for("index"))
         else:
             error = "Invalid username or password"
     return render_template("login.html", error=error)
@@ -72,52 +83,48 @@ def login():
 def logout():
     session.pop("admin", None)
     flash("Logged out.", "info")
-    return redirect(url_for("index"))
+    return redirect(url_for("login"))
 
 # -------------------------
-# Voters management
+# Voter Management
 # -------------------------
+
 @app.route("/voters")
+@admin_required
 def voters():
-    if not session.get("admin"):
-        return redirect(url_for("login"))
     conn = get_db_connection()
     rows = conn.execute("SELECT * FROM voters ORDER BY id").fetchall()
     conn.close()
     return render_template("voters.html", voters=rows)
 
 @app.route("/add-voter", methods=["GET", "POST"])
+@admin_required
 def add_voter():
-    if not session.get("admin"):
-        return redirect(url_for("login"))
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
         template = (request.form.get("fingerprint_template") or "").strip()
         if not name or not template:
-            flash("❌ Name and fingerprint template are required.", "danger")
+            flash("Name and fingerprint template are required.", "danger")
             return redirect(url_for("add_voter"))
+        conn = get_db_connection()
         try:
-            conn = get_db_connection()
             conn.execute(
                 "INSERT INTO voters (name, fingerprint_template) VALUES (?, ?)",
                 (name, template)
             )
             conn.commit()
             flash("✅ Voter added successfully.", "success")
-        except sqlite3.IntegrityError as e:
-            flash(f"❌ Database error: {e}", "danger")
         except Exception as e:
-            flash(f"❌ Unexpected error: {e}", "danger")
+            flash(f"Error adding voter: {e}", "danger")
         finally:
             conn.close()
         return redirect(url_for("voters"))
     return render_template("add_voter.html")
 
 @app.route("/delete-voter/<int:voter_id>", methods=["POST"])
+@admin_required
 def delete_voter(voter_id):
-    if not session.get("admin"):
-        return redirect(url_for("login"))
-    password = request.form.get("admin_password", "").strip()
+    password = request.form.get("admin_password", "")
     if password != ADMIN_PASSWORD:
         flash("❌ Wrong admin password. Voter not deleted.", "danger")
         return redirect(url_for("voters"))
@@ -145,10 +152,9 @@ def delete_voter(voter_id):
     return redirect(url_for("voters"))
 
 @app.route("/reset-votes", methods=["POST"])
+@admin_required
 def reset_votes():
-    if not session.get("admin"):
-        return redirect(url_for("login"))
-    password = request.form.get("admin_password", "").strip()
+    password = request.form.get("admin_password", "")
     if password != ADMIN_PASSWORD:
         flash("❌ Wrong admin password. Votes not reset.", "danger")
         return redirect(url_for("voters"))
@@ -156,19 +162,20 @@ def reset_votes():
     conn.execute("UPDATE voters SET has_voted = 0")
     conn.commit()
     conn.close()
-    flash("✅ All votes have been reset.", "success")
+    flash("✅ All votes reset.", "success")
     return redirect(url_for("voters"))
 
 # -------------------------
 # Downloads
 # -------------------------
-@app.route("/download-excel")
-def download_excel():
-    if not session.get("admin"):
-        return redirect(url_for("login"))
 
+@app.route("/download-excel")
+@admin_required
+def download_excel():
     conn = get_db_connection()
-    rows = conn.execute("SELECT id, name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id").fetchall()
+    rows = conn.execute(
+        "SELECT id, name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id"
+    ).fetchall()
     conn.close()
 
     wb = Workbook()
@@ -176,29 +183,39 @@ def download_excel():
     ws.title = "Voters"
     ws.append(["ID", "Name", "Fingerprint Template", "Has Voted", "Created At"])
     for r in rows:
-        ws.append([r["id"], r["name"], r["fingerprint_template"], "Yes" if r["has_voted"] else "No", r["created_at"]])
+        ws.append([
+            r["id"],
+            r["name"],
+            r["fingerprint_template"],
+            "Yes" if r["has_voted"] else "No",
+            r["created_at"]
+        ])
 
     virtual_wb = io.BytesIO()
     wb.save(virtual_wb)
     virtual_wb.seek(0)
     fname = f"voters-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.xlsx"
-    return send_file(virtual_wb, download_name=fname, as_attachment=True,
-                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return send_file(
+        virtual_wb,
+        download_name=fname,
+        as_attachment=True,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 @app.route("/download-csv")
+@admin_required
 def download_csv():
-    if not session.get("admin"):
-        return redirect(url_for("login"))
-
     conn = get_db_connection()
-    rows = conn.execute("SELECT id, name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id").fetchall()
+    rows = conn.execute(
+        "SELECT id, name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id"
+    ).fetchall()
     conn.close()
 
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["ID", "Name", "Fingerprint Template", "Has Voted", "Created At"])
     for r in rows:
-        writer.writerow([r["id"], r["name"], r["fingerprint_template"], "Yes" if r["has_voted"] else "No", r["created_at"]])
+        writer.writerow([r["id"], r["name"], r["fingerprint_template"], r["has_voted"], r["created_at"]])
 
     mem = io.BytesIO()
     mem.write(output.getvalue().encode("utf-8"))
@@ -207,7 +224,7 @@ def download_csv():
     return send_file(mem, download_name=fname, as_attachment=True, mimetype="text/csv")
 
 # -------------------------
-# Fingerprint API
+# API for fingerprint verification
 # -------------------------
 @app.route("/api/verify", methods=["POST"])
 def api_verify():
@@ -238,6 +255,7 @@ def api_verify():
 # Stats
 # -------------------------
 @app.route("/stats")
+@admin_required
 def stats():
     conn = get_db_connection()
     total = conn.execute("SELECT COUNT(*) AS c FROM voters").fetchone()["c"]
@@ -247,7 +265,7 @@ def stats():
     return render_template("stats.html", total=total, voted=voted, not_voted=not_voted)
 
 # -------------------------
-# Run
+# Run app
 # -------------------------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
