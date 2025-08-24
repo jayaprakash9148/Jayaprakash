@@ -1,102 +1,74 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Voters Management</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<body class="bg">
-  <div class="center">
-    <div class="card wide">
-      <div class="header">
-        <h2 class="title">Voters Management</h2>
-        <div class="actions">
-          <a class="btn" href="{{ url_for('add_voter') }}">➕ Add Voter</a>
-          <a class="btn" href="{{ url_for('download_excel') }}">⬇️ Excel</a>
-          <a class="btn" href="{{ url_for('download_csv') }}">⬇️ CSV</a>
-          <a class="btn subtle" href="{{ url_for('index') }}">🏠 Dashboard</a>
-          <a class="btn subtle" href="{{ url_for('logout') }}">Logout</a>
-        </div>
-      </div>
-
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for cat, msg in messages %}
-            <div class="flash {{ cat }}">{{ msg }}</div>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
-
-      <form method="post" action="{{ url_for('reset_votes') }}" class="inline-reset" onsubmit="return confirm('Reset all votes?');">
-        <div class="row-gap">
-          <button type="button" class="btn danger" id="resetRevealBtn" onclick="showResetPassword()">🔄 Reset Votes</button>
-          <div id="resetPwdWrap" class="hidden">
-            <input class="input small" type="password" name="admin_password" id="resetPwd" placeholder="Admin password">
-            <button class="btn danger" type="submit">Confirm Reset</button>
-            <button class="btn subtle" type="button" onclick="hideResetPassword()">Cancel</button>
-          </div>
-        </div>
-      </form>
-
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Name</th>
-              <th>Fingerprint Template</th>
-              <th>Voted</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-          {% for v in voters %}
-            <tr>
-              <td>{{ v["id"] }}</td>
-              <td>{{ v["name"] }}</td>
-              <td class="mono">{{ v["fingerprint_template"] }}</td>
-              <td>
-                {% if v["has_voted"] %}<span class="badge yes">Yes</span>{% else %}<span class="badge no">No</span>{% endif %}
-              </td>
-              <td>
-                <form method="post" action="{{ url_for('delete_voter', voter_id=v['id']) }}" class="inline-delete" onsubmit="return confirm('Delete voter #{{ v['id'] }}?');">
-                  <div id="del-wrap-{{ v['id'] }}">
-                    <button type="button" class="btn danger" onclick="revealDeletePwd({{ v['id'] }})">🗑 Delete</button>
-                  </div>
-                  <div id="del-confirm-{{ v['id'] }}" class="hidden">
-                    <input class="input small" type="password" name="admin_password" placeholder="Admin password" required>
-                    <button class="btn danger" type="submit">Confirm</button>
-                    <button class="btn subtle" type="button" onclick="cancelDelete({{ v['id'] }})">Cancel</button>
-                  </div>
-                </form>
-              </td>
-            </tr>
-          {% endfor %}
-          </tbody>
-        </table>
+{% extends "base.html" %}
+{% block content %}
+<div class="row-gap mt-2">
+  <a class="btn" href="{{ url_for('add_voter') }}">➕ Add Voter</a>
+  <a class="btn" href="{{ url_for('download_excel') }}">⬇️ Excel</a>
+  <a class="btn" href="{{ url_for('download_csv') }}">⬇️ CSV</a>
+  <form method="post" action="{{ url_for('reset_votes') }}" class="inline-reset" onsubmit="return confirm('Reset all votes?');">
+    <div class="row-gap">
+      <button type="button" class="btn danger" id="resetRevealBtn" onclick="showResetPassword()">🔄 Reset Votes</button>
+      <div id="resetPwdWrap" class="hidden">
+        <input class="input small" type="password" name="admin_password" id="resetPwd" placeholder="Admin password">
+        <button class="btn danger" type="submit">Confirm Reset</button>
+        <button class="btn subtle" type="button" onclick="hideResetPassword()">Cancel</button>
       </div>
     </div>
-  </div>
+  </form>
+</div>
+
+<div class="table-wrap mt-2">
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Fingerprint</th>
+        <th>Voted</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for v in voters %}
+      <tr>
+        <td>{{ v['id'] }}</td>
+        <td>{{ v['name'] }}</td>
+        <td class="mono">{{ v['fingerprint_template'] }}</td>
+        <td>{% if v['has_voted'] %}<span class="badge yes">Yes</span>{% else %}<span class="badge no">No</span>{% endif %}</td>
+        <td>
+          <form method="post" action="{{ url_for('delete_voter', voter_id=v['id']) }}" class="inline-delete" onsubmit="return confirm('Delete voter #{{ v['id'] }}?');">
+            <div id="del-wrap-{{ v['id'] }}">
+              <button type="button" class="btn danger" onclick="revealDeletePwd({{ v['id'] }})">🗑 Delete</button>
+            </div>
+            <div id="del-confirm-{{ v['id'] }}" class="hidden">
+              <input class="input small" type="password" name="admin_password" placeholder="Admin password" required>
+              <button class="btn danger" type="submit">Confirm</button>
+              <button class="btn subtle" type="button" onclick="cancelDelete({{ v['id'] }})">Cancel</button>
+            </div>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
 
 <script>
-  function showResetPassword() {
-    document.getElementById('resetRevealBtn').classList.add('hidden');
-    document.getElementById('resetPwdWrap').classList.remove('hidden');
-    document.getElementById('resetPwd').focus();
-  }
-  function hideResetPassword() {
-    document.getElementById('resetPwdWrap').classList.add('hidden');
-    document.getElementById('resetRevealBtn').classList.remove('hidden');
-  }
-  function revealDeletePwd(id) {
-    document.getElementById('del-wrap-' + id).classList.add('hidden');
-    document.getElementById('del-confirm-' + id).classList.remove('hidden');
-  }
-  function cancelDelete(id) {
-    document.getElementById('del-confirm-' + id).classList.add('hidden');
-    document.getElementById('del-wrap-' + id).classList.remove('hidden');
-  }
+function showResetPassword() {
+  document.getElementById('resetRevealBtn').classList.add('hidden');
+  document.getElementById('resetPwdWrap').classList.remove('hidden');
+  document.getElementById('resetPwd').focus();
+}
+function hideResetPassword() {
+  document.getElementById('resetPwdWrap').classList.add('hidden');
+  document.getElementById('resetRevealBtn').classList.remove('hidden');
+}
+function revealDeletePwd(id) {
+  document.getElementById('del-wrap-' + id).classList.add('hidden');
+  document.getElementById('del-confirm-' + id).classList.remove('hidden');
+}
+function cancelDelete(id) {
+  document.getElementById('del-confirm-' + id).classList.add('hidden');
+  document.getElementById('del-wrap-' + id).classList.remove('hidden');
+}
 </script>
-</body>
-</html>
+{% endblock %}
