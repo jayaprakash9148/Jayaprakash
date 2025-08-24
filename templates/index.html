@@ -1,36 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Voting System</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <meta charset="UTF-8">
+  <title>Election Voting System</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body>
-<header>
-    <h1>Voting System</h1>
-</header>
-
-<div class="container">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="flash {{ category }}">{{ message }}</div>
-            {% endfor %}
+<body class="bg">
+  <div class="center">
+    <div class="card">
+      <div class="header">
+        <h1 class="title">Election Voting System</h1>
+        {% if admin %}
+          <a class="btn subtle" href="{{ url_for('logout') }}">Logout</a>
+        {% else %}
+          <a class="btn primary" href="{{ url_for('login') }}">Admin Login</a>
         {% endif %}
-    {% endwith %}
+      </div>
 
-    {% if admin %}
-        <h2>Admin Dashboard</h2>
-        <p>Total Voters: {{ total }}</p>
-        <p>Voted: {{ voted }}</p>
-        <p>Not Voted: {{ total - voted }}</p>
-        <a href="{{ url_for('voters') }}">Manage Voters</a>
-        <a href="{{ url_for('stats') }}">View Stats</a>
-        <a href="{{ url_for('logout') }}">Logout</a>
-    {% else %}
-        <h2>Welcome to Voting System</h2>
-        <a href="{{ url_for('login') }}">Admin Login</a>
-    {% endif %}
-</div>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for cat, msg in messages %}
+            <div class="flash {{ cat }}">{{ msg }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      {% if admin %}
+        <div class="grid">
+          <a class="btn block" href="{{ url_for('voters') }}">👥 Voters List</a>
+          <a class="btn block" href="{{ url_for('add_voter') }}">➕ Add Voter</a>
+          <a class="btn block" href="{{ url_for('stats') }}">📊 Live Stats</a>
+          <a class="btn block" href="{{ url_for('download_excel') }}">⬇️ Download Excel</a>
+          <a class="btn block" href="{{ url_for('download_csv') }}">⬇️ Download CSV</a>
+        </div>
+        <div class="muted mt-2">
+          Total: <b>{{ total }}</b> &nbsp;|&nbsp; Voted: <b>{{ voted }}</b> &nbsp;|&nbsp; Not voted: <b>{{ total - voted }}</b>
+        </div>
+      {% else %}
+        <div class="muted">Please login to manage voters or view stats.</div>
+      {% endif %}
+    </div>
+  </div>
 </body>
 </html>

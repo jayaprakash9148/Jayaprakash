@@ -1,31 +1,45 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Add Voter</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <meta charset="UTF-8">
+  <title>Add Voter</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body>
-<header>
-    <h1>Add New Voter</h1>
-</header>
+<body class="bg">
+  <div class="center">
+    <div class="card narrow">
+      <div class="header">
+        <h2 class="title">Add New Voter</h2>
+        <div class="actions">
+          <a class="btn subtle" href="{{ url_for('voters') }}">👥 Voters List</a>
+          <a class="btn subtle" href="{{ url_for('index') }}">🏠 Dashboard</a>
+        </div>
+      </div>
 
-<div class="container">
-    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-            {% for category, message in messages %}
-                <div class="flash {{ category }}">{{ message }}</div>
-            {% endfor %}
+          {% for cat, msg in messages %}
+            <div class="flash {{ cat }}">{{ msg }}</div>
+          {% endfor %}
         {% endif %}
-    {% endwith %}
+      {% endwith %}
 
-    <form method="POST">
-        <input type="text" name="name" placeholder="Voter Name" required><br>
-        <input type="text" name="fingerprint_template" placeholder="Fingerprint Template" required><br>
-        <button type="submit">Add Voter</button>
-    </form>
+      <form method="post" class="stack">
+        <label class="label">Name</label>
+        <input class="input" type="text" name="name" placeholder="Full name" required>
 
-    <a href="{{ url_for('voters') }}">Back to Voters</a>
-</div>
+        <label class="label">Fingerprint Template (raw or serialized text)</label>
+        <textarea class="input" name="fingerprint_template" placeholder="Paste captured template string" rows="4" required></textarea>
+
+        <div class="muted small">Tip: For testing use simple text like <b>FP_ABC_001</b> and send the same from ESP.</div>
+
+        <div class="row-gap">
+          <button class="btn primary" type="submit">Add Voter</button>
+          <a class="btn subtle" href="{{ url_for('voters') }}">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
 </body>
 </html>

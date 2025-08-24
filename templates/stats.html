@@ -1,20 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Voting Stats</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <meta charset="UTF-8">
+  <title>Live Stats · Election Server</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
-<body>
-<header>
-    <h1>Voting Statistics</h1>
-</header>
+<body class="bg">
+  <div class="center">
+    <div class="card narrow">
+      <div class="header">
+        <h2 class="title">Live Stats</h2>
+        <div class="actions">
+          <a class="btn subtle" href="{{ url_for('index') }}">🏠 Dashboard</a>
+          {% if session.get('admin') %}
+            <a class="btn subtle" href="{{ url_for('voters') }}">👥 Voters</a>
+          {% endif %}
+        </div>
+      </div>
 
-<div class="container">
-    <p>Total Voters: {{ total }}</p>
-    <p>Voted: {{ voted }}</p>
-    <p>Not Voted: {{ not_voted }}</p>
-    <a href="{{ url_for('index') }}">Back to Dashboard</a>
-</div>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-title">Total registered voters</div>
+          <div class="stat-value">{{ total }}</div>
+        </div>
+        <div class="stat">
+          <div class="stat-title">Votes cast</div>
+          <div class="stat-value">{{ voted }}</div>
+        </div>
+        <div class="stat">
+          <div class="stat-title">Not yet voted</div>
+          <div class="stat-value">{{ not_voted }}</div>
+        </div>
+      </div>
+
+      {% if session.get('admin') %}
+      <div class="row-gap mt-2">
+        <a class="btn" href="{{ url_for('download_excel') }}">⬇️ Download Excel</a>
+        <a class="btn" href="{{ url_for('download_csv') }}">⬇️ Download CSV</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
 </body>
 </html>

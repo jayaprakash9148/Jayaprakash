@@ -3,17 +3,17 @@ from flask import (
     session, flash, send_file, jsonify
 )
 import sqlite3
-import os
 import io
-from openpyxl import Workbook
 from datetime import datetime
+from openpyxl import Workbook
+import csv
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey_change_this"
+app.secret_key = "supersecretkey_change_this"  # change before production
 
 DB_FILE = "voters.db"
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "admin123"
+ADMIN_PASSWORD = "admin123"  # change to a strong password
 
 # -------------------------
 # DB helpers
@@ -24,6 +24,7 @@ def get_db_connection():
     return conn
 
 def init_db():
+    """Create voters table if missing (persistent, no seeding)."""
     conn = get_db_connection()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS voters (
@@ -78,6 +79,7 @@ def logout():
 # -------------------------
 @app.route("/voters")
 def voters():
+    """Voters list page (no add form)."""
     if not session.get("admin"):
         return redirect(url_for("login"))
     conn = get_db_connection()
@@ -87,6 +89,7 @@ def voters():
 
 @app.route("/add-voter", methods=["GET", "POST"])
 def add_voter():
+    """Separate Add Voter page."""
     if not session.get("admin"):
         return redirect(url_for("login"))
     if request.method == "POST":
@@ -96,18 +99,26 @@ def add_voter():
             flash("Name and fingerprint template are required.", "danger")
             return redirect(url_for("add_voter"))
         conn = get_db_connection()
-        conn.execute(
-            "INSERT INTO voters (name, fingerprint_template) VALUES (?, ?)",
-            (name, template)
-        )
-        conn.commit()
-        conn.close()
-        flash("✅ Voter added.", "success")
+        try:
+            conn.execute(
+                "INSERT INTO voters (name, fingerprint_template) VALUES (?, ?)",
+                (name, template)
+            )
+            conn.commit()
+            flash("✅ Voter added.", "success")
+        except Exception as e:
+            flash(f"Error adding voter: {e}", "danger")
+        finally:
+            conn.close()
         return redirect(url_for("voters"))
     return render_template("add_voter.html")
 
 @app.route("/delete-voter/<int:voter_id>", methods=["POST"])
 def delete_voter(voter_id):
+    """
+    Delete requires an inline admin_password field.
+    Flow: click Delete -> reveal password inline -> submit to confirm.
+    """
     if not session.get("admin"):
         return redirect(url_for("login"))
     password = request.form.get("admin_password", "")
@@ -116,14 +127,35 @@ def delete_voter(voter_id):
         return redirect(url_for("voters"))
 
     conn = get_db_connection()
+    # delete target row
     conn.execute("DELETE FROM voters WHERE id = ?", (voter_id,))
     conn.commit()
+
+    # resequence IDs so they remain sequential (1..N)
+    rows = conn.execute(
+        "SELECT name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id"
+    ).fetchall()
+    conn.execute("DELETE FROM voters")
+    conn.commit()
+    next_id = 1
+    for r in rows:
+        conn.execute(
+            "INSERT INTO voters (id, name, fingerprint_template, has_voted, created_at) VALUES (?, ?, ?, ?, ?)",
+            (next_id, r["name"], r["fingerprint_template"], r["has_voted"], r["created_at"])
+        )
+        next_id += 1
+    conn.commit()
     conn.close()
-    flash("✅ Voter deleted.", "success")
+
+    flash("✅ Voter deleted and IDs resequenced.", "success")
     return redirect(url_for("voters"))
 
 @app.route("/reset-votes", methods=["POST"])
 def reset_votes():
+    """
+    Reset votes (has_voted -> 0) requires inline admin_password entry.
+    First click reveals password field; second click submits.
+    """
     if not session.get("admin"):
         return redirect(url_for("login"))
     password = request.form.get("admin_password", "")
@@ -137,25 +169,103 @@ def reset_votes():
     flash("✅ All votes reset.", "success")
     return redirect(url_for("voters"))
 
+# -------------------------
+# Downloads
+# -------------------------
 @app.route("/download-excel")
 def download_excel():
     if not session.get("admin"):
         return redirect(url_for("login"))
+
     conn = get_db_connection()
-    rows = conn.execute("SELECT id, name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id").fetchall()
+    rows = conn.execute(
+        "SELECT id, name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id"
+    ).fetchall()
     conn.close()
+
     wb = Workbook()
     ws = wb.active
     ws.title = "Voters"
     ws.append(["ID", "Name", "Fingerprint Template", "Has Voted", "Created At"])
     for r in rows:
-        ws.append([r["id"], r["name"], r["fingerprint_template"], "Yes" if r["has_voted"] else "No", r["created_at"]])
+        ws.append([
+            r["id"],
+            r["name"],
+            r["fingerprint_template"],
+            "Yes" if r["has_voted"] else "No",
+            r["created_at"]
+        ])
+
     virtual_wb = io.BytesIO()
     wb.save(virtual_wb)
     virtual_wb.seek(0)
     fname = f"voters-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.xlsx"
-    return send_file(virtual_wb, download_name=fname, as_attachment=True, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    return send_file(
+        virtual_wb,
+        download_name=fname,
+        as_attachment=True,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
+@app.route("/download-csv")
+def download_csv():
+    if not session.get("admin"):
+        return redirect(url_for("login"))
+
+    conn = get_db_connection()
+    rows = conn.execute(
+        "SELECT id, name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id"
+    ).fetchall()
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Name", "Fingerprint Template", "Has Voted", "Created At"])
+    for r in rows:
+        writer.writerow([r["id"], r["name"], r["fingerprint_template"], r["has_voted"], r["created_at"]])
+
+    mem = io.BytesIO()
+    mem.write(output.getvalue().encode("utf-8"))
+    mem.seek(0)
+    fname = f"voters-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.csv"
+    return send_file(mem, download_name=fname, as_attachment=True, mimetype="text/csv")
+
+# -------------------------
+# API for fingerprint verification (ESP -> server)
+# -------------------------
+@app.route("/api/verify", methods=["POST"])
+def api_verify():
+    """
+    Expect JSON: { "fingerprint_template": "<raw_string>" }
+    If found and not voted -> mark voted and return success.
+    If already voted -> return error.
+    """
+    payload = request.get_json(silent=True)
+    if not payload or "fingerprint_template" not in payload:
+        return jsonify({"status":"error","message":"No template provided"}), 400
+
+    tpl = (payload["fingerprint_template"] or "").strip()
+    if not tpl:
+        return jsonify({"status":"error","message":"Empty template"}), 400
+
+    conn = get_db_connection()
+    r = conn.execute("SELECT * FROM voters WHERE fingerprint_template = ?", (tpl,)).fetchone()
+    if not r:
+        conn.close()
+        return jsonify({"status":"error","message":"Fingerprint not recognized"}), 404
+
+    if r["has_voted"]:
+        conn.close()
+        return jsonify({"status":"error","message":"Already voted"}), 409
+
+    conn.execute("UPDATE voters SET has_voted = 1 WHERE id = ?", (r["id"],))
+    conn.commit()
+    conn.close()
+    return jsonify({"status":"success", "id": r["id"], "name": r["name"], "has_voted": 1})
+
+# -------------------------
+# Stats
+# -------------------------
 @app.route("/stats")
 def stats():
     conn = get_db_connection()
