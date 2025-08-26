@@ -7,11 +7,17 @@ import io
 from datetime import datetime
 from openpyxl import Workbook
 import csv
+import base64
+import os
 
-app = Flask(__name__)
+app = Flask(_name_)
 app.secret_key = "supersecretkey_change_this"  # Change before production
 
 DB_FILE = "voters.db"
+# Save fingerprint photos inside Flask static so they can be served directly.
+IMAGE_DIR = os.path.join("static", "uploads")
+os.makedirs(IMAGE_DIR, exist_ok=True)
+
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD = "admin123"  # Change to a strong password
 
@@ -27,13 +33,14 @@ def init_db():
     """Create voters table if missing (persistent, no seeding)."""
     conn = get_db_connection()
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS voters (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            fingerprint_template TEXT NOT NULL,
-            has_voted INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
+    CREATE TABLE IF NOT EXISTS voters (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        fingerprint_template TEXT NOT NULL,
+        fingerprint_image TEXT,
+        has_voted INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
     """)
     conn.commit()
     conn.close()
@@ -74,6 +81,7 @@ def login():
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             session["admin"] = True
             flash("✅ Logged in as admin.", "success")
+            # redirect to dashboard/index
             return redirect(url_for("index"))
         else:
             error = "Invalid username or password"
@@ -103,14 +111,30 @@ def add_voter():
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
         template = (request.form.get("fingerprint_template") or "").strip()
+        file = request.files.get("fingerprint_image")
+
         if not name or not template:
             flash("Name and fingerprint template are required.", "danger")
             return redirect(url_for("add_voter"))
+
+        # save optional fingerprint image (store filename only so templates can serve via static/uploads)
+        filename = None
+        if file and file.filename:
+            # sanitize filename somewhat (very simple)
+            safe_name = "".join(c for c in name if c.isalnum() or c in (" ", "", "-")).strip().replace(" ", "")
+            filename = f"{safe_name}_{int(datetime.utcnow().timestamp())}.png"
+            image_path = os.path.join(IMAGE_DIR, filename)
+            try:
+                file.save(image_path)
+            except Exception as e:
+                flash(f"Failed to save image: {e}", "danger")
+                return redirect(url_for("add_voter"))
+
         conn = get_db_connection()
         try:
-            conn.execute(
-                "INSERT INTO voters (name, fingerprint_template) VALUES (?, ?)",
-                (name, template)
+            cur = conn.execute(
+                "INSERT INTO voters (name, fingerprint_template, fingerprint_image) VALUES (?, ?, ?)",
+                (name, template, filename)
             )
             conn.commit()
             flash("✅ Voter added successfully.", "success")
@@ -130,20 +154,31 @@ def delete_voter(voter_id):
         return redirect(url_for("voters"))
 
     conn = get_db_connection()
+    # remove image file if present
+    row = conn.execute("SELECT fingerprint_image FROM voters WHERE id = ?", (voter_id,)).fetchone()
+    if row and row["fingerprint_image"]:
+        try:
+            path = os.path.join(IMAGE_DIR, row["fingerprint_image"])
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception:
+            # non-fatal; continue
+            pass
+
     conn.execute("DELETE FROM voters WHERE id = ?", (voter_id,))
     conn.commit()
 
     # resequence IDs
     rows = conn.execute(
-        "SELECT name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id"
+        "SELECT name, fingerprint_template, fingerprint_image, has_voted, created_at FROM voters ORDER BY id"
     ).fetchall()
     conn.execute("DELETE FROM voters")
     conn.commit()
     next_id = 1
     for r in rows:
         conn.execute(
-            "INSERT INTO voters (id, name, fingerprint_template, has_voted, created_at) VALUES (?, ?, ?, ?, ?)",
-            (next_id, r["name"], r["fingerprint_template"], r["has_voted"], r["created_at"])
+            "INSERT INTO voters (id, name, fingerprint_template, fingerprint_image, has_voted, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (next_id, r["name"], r["fingerprint_template"], r["fingerprint_image"], r["has_voted"], r["created_at"])
         )
         next_id += 1
     conn.commit()
@@ -174,19 +209,20 @@ def reset_votes():
 def download_excel():
     conn = get_db_connection()
     rows = conn.execute(
-        "SELECT id, name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id"
+        "SELECT id, name, fingerprint_template, fingerprint_image, has_voted, created_at FROM voters ORDER BY id"
     ).fetchall()
     conn.close()
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Voters"
-    ws.append(["ID", "Name", "Fingerprint Template", "Has Voted", "Created At"])
+    ws.append(["ID", "Name", "Fingerprint Template", "Fingerprint Image Filename", "Has Voted", "Created At"])
     for r in rows:
         ws.append([
             r["id"],
             r["name"],
             r["fingerprint_template"],
+            r["fingerprint_image"] or "",
             "Yes" if r["has_voted"] else "No",
             r["created_at"]
         ])
@@ -207,15 +243,15 @@ def download_excel():
 def download_csv():
     conn = get_db_connection()
     rows = conn.execute(
-        "SELECT id, name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id"
+        "SELECT id, name, fingerprint_template, fingerprint_image, has_voted, created_at FROM voters ORDER BY id"
     ).fetchall()
     conn.close()
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["ID", "Name", "Fingerprint Template", "Has Voted", "Created At"])
+    writer.writerow(["ID", "Name", "Fingerprint Template", "Fingerprint Image Filename", "Has Voted", "Created At"])
     for r in rows:
-        writer.writerow([r["id"], r["name"], r["fingerprint_template"], r["has_voted"], r["created_at"]])
+        writer.writerow([r["id"], r["name"], r["fingerprint_template"], r["fingerprint_image"] or "", r["has_voted"], r["created_at"]])
 
     mem = io.BytesIO()
     mem.write(output.getvalue().encode("utf-8"))
@@ -224,8 +260,51 @@ def download_csv():
     return send_file(mem, download_name=fname, as_attachment=True, mimetype="text/csv")
 
 # -------------------------
-# API for fingerprint verification
+# API for fingerprint enrollment & verification
 # -------------------------
+
+@app.route("/api/enroll", methods=["POST"])
+def api_enroll():
+    """
+    ESP sends: { "name": "John", "fingerprint_template": "raw_data_or_hash", "fingerprint_image": "<base64>" }
+    """
+    payload = request.get_json(silent=True)
+    if not payload or "name" not in payload or "fingerprint_template" not in payload:
+        return jsonify({"status": "error", "message": "Name and fingerprint required"}), 400
+
+    name = payload["name"].strip()
+    tpl = payload["fingerprint_template"].strip()
+    img_b64 = payload.get("fingerprint_image")
+
+    if not name or not tpl:
+        return jsonify({"status": "error", "message": "Invalid input"}), 400
+
+    filename = None
+    if img_b64:
+        try:
+            img_data = base64.b64decode(img_b64)
+            safe_name = "".join(c for c in name if c.isalnum() or c in (" ", "", "-")).strip().replace(" ", "")
+            filename = f"{safe_name}_{int(datetime.utcnow().timestamp())}.png"
+            image_path = os.path.join(IMAGE_DIR, filename)
+            with open(image_path, "wb") as f:
+                f.write(img_data)
+        except Exception as e:
+            return jsonify({"status": "error", "message": f"Image save failed: {e}"}), 500
+
+    conn = get_db_connection()
+    try:
+        cur = conn.execute(
+            "INSERT INTO voters (name, fingerprint_template, fingerprint_image) VALUES (?, ?, ?)",
+            (name, tpl, filename)
+        )
+        conn.commit()
+        voter_id = cur.lastrowid
+        return jsonify({"status": "success", "id": voter_id, "name": name})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        conn.close()
+
 @app.route("/api/verify", methods=["POST"])
 def api_verify():
     payload = request.get_json(silent=True)
@@ -254,6 +333,7 @@ def api_verify():
 # -------------------------
 # Stats
 # -------------------------
+
 @app.route("/stats")
 @admin_required
 def stats():
@@ -267,5 +347,5 @@ def stats():
 # -------------------------
 # Run app
 # -------------------------
-if __name__ == "__main__":
+if _name_ == "_main_":
     app.run(host="0.0.0.0", port=5000, debug=True)
