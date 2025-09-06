@@ -13,7 +13,7 @@ app.secret_key = "supersecretkey_change_this"  # Change before production
 
 DB_FILE = "voters.db"
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "admin123"  # Change to a strong password
+ADMIN_PASSWORD = "12345"  # Change to a strong password
 
 # -------------------------
 # Database helpers
@@ -24,7 +24,7 @@ def get_db_connection():
     return conn
 
 def init_db():
-    """Create voters table if missing (persistent, no seeding)."""
+    """Create or update voters table (persistent)."""
     conn = get_db_connection()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS voters (
@@ -32,9 +32,20 @@ def init_db():
             name TEXT NOT NULL,
             fingerprint_template TEXT NOT NULL,
             has_voted INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            last_booth TEXT,
+            voted_at TEXT
         )
     """)
+    # Ensure new columns exist for permanent features
+    try:
+        conn.execute("ALTER TABLE voters ADD COLUMN last_booth TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute("ALTER TABLE voters ADD COLUMN voted_at TEXT")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
 
@@ -135,15 +146,15 @@ def delete_voter(voter_id):
 
     # resequence IDs
     rows = conn.execute(
-        "SELECT name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id"
+        "SELECT name, fingerprint_template, has_voted, created_at, last_booth, voted_at FROM voters ORDER BY id"
     ).fetchall()
     conn.execute("DELETE FROM voters")
     conn.commit()
     next_id = 1
     for r in rows:
         conn.execute(
-            "INSERT INTO voters (id, name, fingerprint_template, has_voted, created_at) VALUES (?, ?, ?, ?, ?)",
-            (next_id, r["name"], r["fingerprint_template"], r["has_voted"], r["created_at"])
+            "INSERT INTO voters (id, name, fingerprint_template, has_voted, created_at, last_booth, voted_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (next_id, r["name"], r["fingerprint_template"], r["has_voted"], r["created_at"], r["last_booth"], r["voted_at"])
         )
         next_id += 1
     conn.commit()
@@ -159,7 +170,7 @@ def reset_votes():
         flash("❌ Wrong admin password. Votes not reset.", "danger")
         return redirect(url_for("voters"))
     conn = get_db_connection()
-    conn.execute("UPDATE voters SET has_voted = 0")
+    conn.execute("UPDATE voters SET has_voted = 0, last_booth=NULL, voted_at=NULL")
     conn.commit()
     conn.close()
     flash("✅ All votes reset.", "success")
@@ -174,21 +185,23 @@ def reset_votes():
 def download_excel():
     conn = get_db_connection()
     rows = conn.execute(
-        "SELECT id, name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id"
+        "SELECT id, name, fingerprint_template, has_voted, created_at, last_booth, voted_at FROM voters ORDER BY id"
     ).fetchall()
     conn.close()
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Voters"
-    ws.append(["ID", "Name", "Fingerprint Template", "Has Voted", "Created At"])
+    ws.append(["ID", "Name", "Fingerprint Template", "Has Voted", "Created At", "Last Booth", "Voted At"])
     for r in rows:
         ws.append([
             r["id"],
             r["name"],
             r["fingerprint_template"],
             "Yes" if r["has_voted"] else "No",
-            r["created_at"]
+            r["created_at"],
+            r["last_booth"] if r["last_booth"] else "",
+            r["voted_at"] if r["voted_at"] else ""
         ])
 
     virtual_wb = io.BytesIO()
@@ -207,15 +220,15 @@ def download_excel():
 def download_csv():
     conn = get_db_connection()
     rows = conn.execute(
-        "SELECT id, name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id"
+        "SELECT id, name, fingerprint_template, has_voted, created_at, last_booth, voted_at FROM voters ORDER BY id"
     ).fetchall()
     conn.close()
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["ID", "Name", "Fingerprint Template", "Has Voted", "Created At"])
+    writer.writerow(["ID", "Name", "Fingerprint Template", "Has Voted", "Created At", "Last Booth", "Voted At"])
     for r in rows:
-        writer.writerow([r["id"], r["name"], r["fingerprint_template"], r["has_voted"], r["created_at"]])
+        writer.writerow([r["id"], r["name"], r["fingerprint_template"], r["has_voted"], r["created_at"], r["last_booth"] or "", r["voted_at"] or ""])
 
     mem = io.BytesIO()
     mem.write(output.getvalue().encode("utf-8"))
@@ -224,8 +237,27 @@ def download_csv():
     return send_file(mem, download_name=fname, as_attachment=True, mimetype="text/csv")
 
 # -------------------------
-# API for fingerprint verification
+# API for ESP Enrollment & Verification
 # -------------------------
+
+@app.route("/api/add_voter", methods=["POST"])
+def api_add_voter():
+    payload = request.get_json(silent=True)
+    if not payload or "fingerprint_template" not in payload or "name" not in payload:
+        return jsonify({"status": "error", "message": "Name and fingerprint template required"}), 400
+
+    name = payload["name"].strip()
+    tpl = payload["fingerprint_template"].strip()
+
+    conn = get_db_connection()
+    conn.execute(
+        "INSERT INTO voters (name, fingerprint_template) VALUES (?, ?)",
+        (name, tpl)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": f"Voter {name} added"})
+
 @app.route("/api/verify", methods=["POST"])
 def api_verify():
     payload = request.get_json(silent=True)
@@ -233,8 +265,7 @@ def api_verify():
         return jsonify({"status": "error", "message": "No template provided"}), 400
 
     tpl = (payload["fingerprint_template"] or "").strip()
-    if not tpl:
-        return jsonify({"status": "error", "message": "Empty template"}), 400
+    booth = (payload.get("booth") or "Unknown").strip()
 
     conn = get_db_connection()
     r = conn.execute("SELECT * FROM voters WHERE fingerprint_template = ?", (tpl,)).fetchone()
@@ -246,10 +277,12 @@ def api_verify():
         conn.close()
         return jsonify({"status": "error", "message": "Already voted"}), 409
 
-    conn.execute("UPDATE voters SET has_voted = 1 WHERE id = ?", (r["id"],))
+    # Mark as voted with booth + timestamp
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    conn.execute("UPDATE voters SET has_voted=1, last_booth=?, voted_at=? WHERE id=?", (booth, now, r["id"]))
     conn.commit()
     conn.close()
-    return jsonify({"status": "success", "id": r["id"], "name": r["name"], "has_voted": 1})
+    return jsonify({"status": "success", "id": r["id"], "name": r["name"], "has_voted": 1, "booth": booth, "time": now})
 
 # -------------------------
 # Stats

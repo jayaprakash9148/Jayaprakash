@@ -270,6 +270,23 @@ tr:hover {
     margin-top: 20px;
 }
 
+/* === Make Voter List / Add Voter / Stats / Excel / CSV buttons visible like text box === */
+.grid .btn, .grid a {
+    background: rgba(255,255,255,0.08);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 12px 15px;
+    border-radius: 10px;
+    text-align: center;
+    font-weight: 500;
+    transition: 0.3s;
+}
+
+.grid .btn:hover, .grid a:hover {
+    background: rgba(0,213,255,0.15);
+    box-shadow: 0 5px 15px rgba(0,213,255,0.2);
+}
+
 /* === Excel/CSV buttons for voter list === */
 .export-btn {
     padding: 10px 15px;
