@@ -5,8 +5,8 @@
 <h2 class="title">Voters Management</h2>
 <div class="actions">
   <a class="btn" href="{{ url_for('add_voter') }}">➕ Add Voter</a>
-  <a class="btn" href="{{ url_for('download_excel') }}">⬇️ Excel</a>
-  <a class="btn" href="{{ url_for('download_csv') }}">⬇️ CSV</a>
+  <a class="btn" href="{{ url_for('download_excel') }}">⬇ Excel</a>
+  <a class="btn" href="{{ url_for('download_csv') }}">⬇ CSV</a>
   <a class="btn subtle" href="{{ url_for('index') }}">🏠 Dashboard</a>
   <a class="btn subtle" href="{{ url_for('logout') }}">Logout</a>
 </div>
@@ -35,7 +35,12 @@
 <table>
 <thead>
 <tr>
-<th>ID</th><th>Name</th><th>Fingerprint Template</th><th>Voted</th><th>Actions</th>
+<th>ID</th>
+<th>Name</th>
+<th>Photo</th>   <!-- 👈 New column -->
+<th>Fingerprint Template</th>
+<th>Voted</th>
+<th>Actions</th>
 </tr>
 </thead>
 <tbody>
@@ -43,8 +48,24 @@
 <tr>
 <td>{{ v["id"] }}</td>
 <td>{{ v["name"] }}</td>
+
+<!-- 👇 Small thumbnail image -->
+<td>
+  {% if v["photo"] %}
+    <img src="{{ url_for('static', filename='uploads/' ~ v['photo']) }}" alt="photo" style="width:40px;height:40px;border-radius:50%;">
+  {% else %}
+    <span class="badge no">No Photo</span>
+  {% endif %}
+</td>
+
 <td class="mono">{{ v["fingerprint_template"] }}</td>
-<td>{% if v["has_voted"] %}<span class="badge yes">Yes</span>{% else %}<span class="badge no">No</span>{% endif %}</td>
+<td>
+  {% if v["has_voted"] %}
+    <span class="badge yes">Yes</span>
+  {% else %}
+    <span class="badge no">No</span>
+  {% endif %}
+</td>
 <td>
 <form method="post" action="{{ url_for('delete_voter', voter_id=v['id']) }}" class="inline-delete" onsubmit="return confirm('Delete voter #{{ v['id'] }}?');">
 <div id="del-wrap-{{ v['id'] }}">
