@@ -3,22 +3,62 @@
 {% block content %}
 <h2 class="title">Live Stats</h2>
 <div class="actions">
-<a class="btn subtle" href="{{ url_for('index') }}">🏠 Dashboard</a>
-{% if session.get('admin') %}
-<a class="btn subtle" href="{{ url_for('voters') }}">👥 Voters</a>
-{% endif %}
+  <a class="btn subtle" href="{{ url_for('index') }}">🏠 Dashboard</a>
+  {% if session.get('admin') %}
+  <a class="btn subtle" href="{{ url_for('voters') }}">👥 Voters</a>
+  {% endif %}
 </div>
 
 <div class="stats">
-<div class="stat"><div class="stat-title">Total voters</div><div class="stat-value">{{ total }}</div></div>
-<div class="stat"><div class="stat-title">Votes cast</div><div class="stat-value">{{ voted }}</div></div>
-<div class="stat"><div class="stat-title">Not yet voted</div><div class="stat-value">{{ not_voted }}</div></div>
+  <!-- ✅ Overall -->
+  <div class="stat">
+    <div class="stat-title">Total voters</div>
+    <div class="stat-value">{{ total }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Votes cast</div>
+    <div class="stat-value">{{ voted }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Not yet voted</div>
+    <div class="stat-value">{{ not_voted }}</div>
+  </div>
+
+  <!-- ✅ Gender totals -->
+  <div class="stat">
+    <div class="stat-title">Male voters</div>
+    <div class="stat-value">{{ male_total }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Female voters</div>
+    <div class="stat-value">{{ female_total }}</div>
+  </div>
+
+  <!-- ✅ Gender voted -->
+  <div class="stat">
+    <div class="stat-title">Male voted</div>
+    <div class="stat-value">{{ male_voted }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Female voted</div>
+    <div class="stat-value">{{ female_voted }}</div>
+  </div>
+
+  <!-- ✅ Gender not voted -->
+  <div class="stat">
+    <div class="stat-title">Male not voted</div>
+    <div class="stat-value">{{ male_total - male_voted }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Female not voted</div>
+    <div class="stat-value">{{ female_total - female_voted }}</div>
+  </div>
 </div>
 
 {% if session.get('admin') %}
 <div class="row-gap mt-2">
-<a class="btn" href="{{ url_for('download_excel') }}">⬇️ Download Excel</a>
-<a class="btn" href="{{ url_for('download_csv') }}">⬇️ Download CSV</a>
+  <a class="btn" href="{{ url_for('download_excel') }}">⬇️ Download Excel</a>
+  <a class="btn" href="{{ url_for('download_csv') }}">⬇️ Download CSV</a>
 </div>
 {% endif %}
 {% endblock %}

@@ -37,7 +37,8 @@
 <tr>
 <th>ID</th>
 <th>Name</th>
-<th>Photo</th>   <!-- 👈 New column -->
+<th>Gender</th>   <!-- ✅ Added Gender column -->
+<th>Photo</th>
 <th>Fingerprint Template</th>
 <th>Voted</th>
 <th>Actions</th>
@@ -48,6 +49,7 @@
 <tr>
 <td>{{ v["id"] }}</td>
 <td>{{ v["name"] }}</td>
+<td>{{ v["gender"] }}</td>   <!-- ✅ Show Gender -->
 
 <!-- 👇 Small thumbnail image -->
 <td>

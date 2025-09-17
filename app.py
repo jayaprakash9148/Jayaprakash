@@ -2,7 +2,8 @@ from flask import (
     Flask, render_template, request, redirect, url_for,
     session, flash, send_file, jsonify
 )
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import io
 from datetime import datetime
 from openpyxl import Workbook
@@ -13,35 +14,33 @@ app = Flask(__name__)
 app.secret_key = "supersecretkey_change_this"  # Change before production
 
 # -------------------------
-# Permanent Database File
+# Permanent PostgreSQL Database
 # -------------------------
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DB_FILE = os.path.join(BASE_DIR, "voters.db")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "admin123"  # Change to a strong password
-
-# -------------------------
-# Database helpers
-# -------------------------
 def get_db_connection():
-    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
+    # Ensure DATABASE_URL is set in environment (Render sets it when you add a Postgres add-on)
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL environment variable is not set.")
+    conn = psycopg2.connect(DATABASE_URL, sslmode="require")
     return conn
 
 def init_db():
     """Create voters table if missing (persistent)."""
     conn = get_db_connection()
-    conn.execute("""
+    cur = conn.cursor()
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS voters (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,
+            gender TEXT NOT NULL,
             fingerprint_template TEXT NOT NULL,
             has_voted INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     conn.commit()
+    cur.close()
     conn.close()
 
 # Ensure DB always exists before app runs
@@ -61,16 +60,47 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "admin123"  # Change to a strong password
+
 @app.route("/")
 def index():
     admin = session.get("admin", False)
     total = voted = 0
+    # provide male/female counts on dashboard only if admin (safe)
+    male_total = female_total = male_voted = female_voted = 0
     if admin:
         conn = get_db_connection()
-        total = conn.execute("SELECT COUNT(*) AS c FROM voters").fetchone()["c"]
-        voted = conn.execute("SELECT COUNT(*) AS c FROM voters WHERE has_voted=1").fetchone()["c"]
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur.execute("SELECT COUNT(*) AS c FROM voters")
+        total = cur.fetchone()["c"] or 0
+        cur.execute("SELECT COUNT(*) AS c FROM voters WHERE has_voted=1")
+        voted = cur.fetchone()["c"] or 0
+
+        # also compute male/female totals (useful for dashboard if template expects them)
+        cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s", ("Male",))
+        male_total = cur.fetchone()["c"] or 0
+        cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s", ("Female",))
+        female_total = cur.fetchone()["c"] or 0
+
+        cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s AND has_voted=1", ("Male",))
+        male_voted = cur.fetchone()["c"] or 0
+        cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s AND has_voted=1", ("Female",))
+        female_voted = cur.fetchone()["c"] or 0
+
+        cur.close()
         conn.close()
-    return render_template("index.html", admin=admin, total=total, voted=voted)
+    # pass extra gender stats safely; templates that don't use them won't break
+    return render_template(
+        "index.html",
+        admin=admin,
+        total=total,
+        voted=voted,
+        male_total=male_total,
+        female_total=female_total,
+        male_voted=male_voted,
+        female_voted=female_voted
+    )
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -100,7 +130,10 @@ def logout():
 @admin_required
 def voters():
     conn = get_db_connection()
-    rows = conn.execute("SELECT * FROM voters ORDER BY id").fetchall()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("SELECT * FROM voters ORDER BY id")
+    rows = cur.fetchall()
+    cur.close()
     conn.close()
     return render_template("voters.html", voters=rows)
 
@@ -109,21 +142,24 @@ def voters():
 def add_voter():
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
+        gender = (request.form.get("gender") or "").strip()
         template = (request.form.get("fingerprint_template") or "").strip()
-        if not name or not template:
-            flash("Name and fingerprint template are required.", "danger")
+        if not name or not gender or not template:
+            flash("Name, gender and fingerprint template are required.", "danger")
             return redirect(url_for("add_voter"))
         conn = get_db_connection()
+        cur = conn.cursor()
         try:
-            conn.execute(
-                "INSERT INTO voters (name, fingerprint_template) VALUES (?, ?)",
-                (name, template)
+            cur.execute(
+                "INSERT INTO voters (name, gender, fingerprint_template) VALUES (%s, %s, %s)",
+                (name, gender, template)
             )
             conn.commit()
             flash("✅ Voter added successfully.", "success")
         except Exception as e:
             flash(f"Error adding voter: {e}", "danger")
         finally:
+            cur.close()
             conn.close()
         return redirect(url_for("voters"))
     return render_template("add_voter.html")
@@ -137,25 +173,12 @@ def delete_voter(voter_id):
         return redirect(url_for("voters"))
 
     conn = get_db_connection()
-    conn.execute("DELETE FROM voters WHERE id = ?", (voter_id,))
+    cur = conn.cursor()
+    cur.execute("DELETE FROM voters WHERE id = %s", (voter_id,))
     conn.commit()
-
-    # resequence IDs
-    rows = conn.execute(
-        "SELECT name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id"
-    ).fetchall()
-    conn.execute("DELETE FROM voters")
-    conn.commit()
-    next_id = 1
-    for r in rows:
-        conn.execute(
-            "INSERT INTO voters (id, name, fingerprint_template, has_voted, created_at) VALUES (?, ?, ?, ?, ?)",
-            (next_id, r["name"], r["fingerprint_template"], r["has_voted"], r["created_at"])
-        )
-        next_id += 1
-    conn.commit()
+    cur.close()
     conn.close()
-    flash("✅ Voter deleted and IDs resequenced.", "success")
+    flash("✅ Voter deleted.", "success")
     return redirect(url_for("voters"))
 
 @app.route("/reset-votes", methods=["POST"])
@@ -166,8 +189,10 @@ def reset_votes():
         flash("❌ Wrong admin password. Votes not reset.", "danger")
         return redirect(url_for("voters"))
     conn = get_db_connection()
-    conn.execute("UPDATE voters SET has_voted = 0")
+    cur = conn.cursor()
+    cur.execute("UPDATE voters SET has_voted = 0")
     conn.commit()
+    cur.close()
     conn.close()
     flash("✅ All votes reset.", "success")
     return redirect(url_for("voters"))
@@ -180,19 +205,21 @@ def reset_votes():
 @admin_required
 def download_excel():
     conn = get_db_connection()
-    rows = conn.execute(
-        "SELECT id, name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id"
-    ).fetchall()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("SELECT id, name, gender, fingerprint_template, has_voted, created_at FROM voters ORDER BY id")
+    rows = cur.fetchall()
+    cur.close()
     conn.close()
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Voters"
-    ws.append(["ID", "Name", "Fingerprint Template", "Has Voted", "Created At"])
+    ws.append(["ID", "Name", "Gender", "Fingerprint Template", "Has Voted", "Created At"])
     for r in rows:
         ws.append([
             r["id"],
             r["name"],
+            r["gender"],
             r["fingerprint_template"],
             "Yes" if r["has_voted"] else "No",
             r["created_at"]
@@ -213,16 +240,17 @@ def download_excel():
 @admin_required
 def download_csv():
     conn = get_db_connection()
-    rows = conn.execute(
-        "SELECT id, name, fingerprint_template, has_voted, created_at FROM voters ORDER BY id"
-    ).fetchall()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("SELECT id, name, gender, fingerprint_template, has_voted, created_at FROM voters ORDER BY id")
+    rows = cur.fetchall()
+    cur.close()
     conn.close()
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["ID", "Name", "Fingerprint Template", "Has Voted", "Created At"])
+    writer.writerow(["ID", "Name", "Gender", "Fingerprint Template", "Has Voted", "Created At"])
     for r in rows:
-        writer.writerow([r["id"], r["name"], r["fingerprint_template"], r["has_voted"], r["created_at"]])
+        writer.writerow([r["id"], r["name"], r["gender"], r["fingerprint_template"], r["has_voted"], r["created_at"]])
 
     mem = io.BytesIO()
     mem.write(output.getvalue().encode("utf-8"))
@@ -244,19 +272,24 @@ def api_verify():
         return jsonify({"status": "error", "message": "Empty template"}), 400
 
     conn = get_db_connection()
-    r = conn.execute("SELECT * FROM voters WHERE fingerprint_template = ?", (tpl,)).fetchone()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("SELECT * FROM voters WHERE fingerprint_template = %s", (tpl,))
+    r = cur.fetchone()
     if not r:
+        cur.close()
         conn.close()
         return jsonify({"status": "error", "message": "Fingerprint not recognized"}), 404
 
     if r["has_voted"]:
+        cur.close()
         conn.close()
         return jsonify({"status": "error", "message": "Already voted"}), 409
 
-    conn.execute("UPDATE voters SET has_voted = 1 WHERE id = ?", (r["id"],))
+    cur.execute("UPDATE voters SET has_voted = 1 WHERE id = %s", (r["id"],))
     conn.commit()
+    cur.close()
     conn.close()
-    return jsonify({"status": "success", "id": r["id"], "name": r["name"], "has_voted": 1})
+    return jsonify({"status": "success", "id": r["id"], "name": r["name"], "gender": r["gender"], "has_voted": 1})
 
 # -------------------------
 # Stats
@@ -265,14 +298,49 @@ def api_verify():
 @admin_required
 def stats():
     conn = get_db_connection()
-    total = conn.execute("SELECT COUNT(*) AS c FROM voters").fetchone()["c"]
-    voted = conn.execute("SELECT COUNT(*) AS c FROM voters WHERE has_voted=1").fetchone()["c"]
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    # overall
+    cur.execute("SELECT COUNT(*) AS c FROM voters")
+    total = cur.fetchone()["c"] or 0
+    cur.execute("SELECT COUNT(*) AS c FROM voters WHERE has_voted=1")
+    voted = cur.fetchone()["c"] or 0
     not_voted = total - voted
+
+    # gender splits
+    cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s", ("Male",))
+    male_total = cur.fetchone()["c"] or 0
+    cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s", ("Female",))
+    female_total = cur.fetchone()["c"] or 0
+
+    cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s AND has_voted=1", ("Male",))
+    male_voted = cur.fetchone()["c"] or 0
+    cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s AND has_voted=1", ("Female",))
+    female_voted = cur.fetchone()["c"] or 0
+
+    # new: male/female not voted
+    male_not_voted = male_total - male_voted
+    female_not_voted = female_total - female_voted
+
+    cur.close()
     conn.close()
-    return render_template("stats.html", total=total, voted=voted, not_voted=not_voted)
+
+    return render_template(
+        "stats.html",
+        total=total,
+        voted=voted,
+        not_voted=not_voted,
+        male_total=male_total,
+        female_total=female_total,
+        male_voted=male_voted,
+        female_voted=female_voted,
+        male_not_voted=male_not_voted,
+        female_not_voted=female_not_voted
+    )
 
 # -------------------------
 # Run app
 # -------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # On Render the PORT is provided by the environment; for local dev keep 5000
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)
