@@ -66,7 +66,6 @@ def admin_required(f):
 # -------------------------
 # Routes
 # -------------------------
-
 @app.route("/")
 def index():
     admin = session.get("admin", False)
@@ -120,9 +119,6 @@ def logout():
     flash("Logged out.", "info")
     return redirect(url_for("login"))
 
-# -------------------------
-# Stats Page
-# -------------------------
 @app.route("/stats")
 @admin_required
 def stats():
@@ -158,9 +154,6 @@ def stats():
         female_not_voted=female_not_voted
     )
 
-# -------------------------
-# Voter Management
-# -------------------------
 @app.route("/voters")
 @admin_required
 def voters():
@@ -231,9 +224,6 @@ def reset_votes():
     flash("✅ All votes reset.", "success")
     return redirect(url_for("voters"))
 
-# -------------------------
-# Downloads
-# -------------------------
 @app.route("/download-excel")
 @admin_required
 def download_excel():
@@ -280,42 +270,46 @@ def download_csv():
     return send_file(mem, download_name=fname, as_attachment=True, mimetype="text/csv")
 
 # -------------------------
-# Fingerprint API
+# Fingerprint API (Dummy for Sensorless Testing)
 # -------------------------
 @app.route("/api/enroll", methods=["POST"])
 def api_enroll():
-    payload = request.get_json(silent=True)
-    if not payload:
-        return jsonify({"status":"error","message":"No JSON body provided"}), 400
-
+    payload = request.get_json(force=True)
     name = (payload.get("name") or "").strip()
-    gender
     gender = (payload.get("gender") or "").strip()
     template = (payload.get("fingerprint_template") or "").strip()
 
     if not name or not gender or not template:
         return jsonify({"status":"error","message":"Name, gender, and fingerprint_template are required"}), 400
 
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO voters (name, gender, fingerprint_template) VALUES (%s, %s, %s)",
-            (name, gender, template)
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
-        return jsonify({"status":"success","message":"Voter enrolled successfully"}), 200
-    except Exception as e:
-        return jsonify({"status":"error","message":str(e)}), 500
+    # Dummy response (no DB write)
+    return jsonify({
+        "status": "success",
+        "message": f"Enroll received for {name} ({gender})",
+        "template": template
+    }), 200
 
+@app.route("/api/verify", methods=["POST"])
+def api_verify():
+    payload = request.get_json(force=True)
+    template = (payload.get("fingerprint_template") or "").strip()
+
+    if not template:
+        return jsonify({"status":"error","message":"Fingerprint template required"}), 400
+
+    # Dummy response
+    return jsonify({
+        "status": "success",
+        "message": f"Verify received for template {template}",
+        "match": True
+    }), 200
+
+# -------------------------
+# Vote API (Actual DB)
+# -------------------------
 @app.route("/api/vote", methods=["POST"])
 def api_vote():
-    payload = request.get_json(silent=True)
-    if not payload:
-        return jsonify({"status":"error","message":"No JSON body provided"}), 400
-
+    payload = request.get_json(force=True)
     template = (payload.get("fingerprint_template") or "").strip()
     if not template:
         return jsonify({"status":"error","message":"Fingerprint template required"}), 400
@@ -361,3 +355,6 @@ def api_stats():
         }), 200
     except Exception as e:
         return jsonify({"status":"error","message":str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
