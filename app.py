@@ -290,3 +290,74 @@ def api_enroll():
 
     name = (payload.get("name") or "").strip()
     gender
+    gender = (payload.get("gender") or "").strip()
+    template = (payload.get("fingerprint_template") or "").strip()
+
+    if not name or not gender or not template:
+        return jsonify({"status":"error","message":"Name, gender, and fingerprint_template are required"}), 400
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO voters (name, gender, fingerprint_template) VALUES (%s, %s, %s)",
+            (name, gender, template)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"status":"success","message":"Voter enrolled successfully"}), 200
+    except Exception as e:
+        return jsonify({"status":"error","message":str(e)}), 500
+
+@app.route("/api/vote", methods=["POST"])
+def api_vote():
+    payload = request.get_json(silent=True)
+    if not payload:
+        return jsonify({"status":"error","message":"No JSON body provided"}), 400
+
+    template = (payload.get("fingerprint_template") or "").strip()
+    if not template:
+        return jsonify({"status":"error","message":"Fingerprint template required"}), 400
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur.execute("SELECT * FROM voters WHERE fingerprint_template = %s", (template,))
+        voter = cur.fetchone()
+        if not voter:
+            cur.close()
+            conn.close()
+            return jsonify({"status":"error","message":"Voter not found"}), 404
+
+        if voter["has_voted"]:
+            cur.close()
+            conn.close()
+            return jsonify({"status":"error","message":"Already voted"}), 403
+
+        cur.execute("UPDATE voters SET has_voted = 1 WHERE id = %s", (voter["id"],))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"status":"success","message":"Vote recorded"}), 200
+    except Exception as e:
+        return jsonify({"status":"error","message":str(e)}), 500
+
+@app.route("/api/stats", methods=["GET"])
+def api_stats():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur.execute("SELECT COUNT(*) AS total FROM voters")
+        total = cur.fetchone()["total"] or 0
+        cur.execute("SELECT COUNT(*) AS voted FROM voters WHERE has_voted=1")
+        voted = cur.fetchone()["voted"] or 0
+        cur.close()
+        conn.close()
+        return jsonify({
+            "total_voters": total,
+            "voted": voted,
+            "not_voted": total - voted
+        }), 200
+    except Exception as e:
+        return jsonify({"status":"error","message":str(e)}), 500
