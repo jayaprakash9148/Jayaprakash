@@ -61,7 +61,7 @@ def admin_required(f):
     return decorated
 
 ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "12345"  # Change to a strong password
+ADMIN_PASSWORD = "admin123"  # Change to a strong password
 
 @app.route("/")
 def index():
@@ -262,53 +262,6 @@ def download_csv():
 # API for fingerprint verification
 # -------------------------
 @app.route("/api/verify", methods=["POST"])
-
-@app.route("/api/enroll", methods=["POST"])
-def api_enroll():
-    """
-    API endpoint for ESP enrollment.
-    Expected JSON payload:
-    {
-      "name": "Full Name",
-      "gender": "Male" or "Female" (optional, default "Unknown"),
-      "fingerprint_template": "<base64 or string>"  OR
-      "template_base64": "<base64 string>" OR
-      "template_id": 123
-    }
-    """
-    payload = request.get_json(silent=True)
-    if not payload:
-        return jsonify({"status":"error","message":"No JSON body provided"}), 400
-
-    name = (payload.get("name") or "").strip()
-    gender = (payload.get("gender") or "Unknown").strip()
-    tpl = None
-    if "fingerprint_template" in payload:
-        tpl = (payload.get("fingerprint_template") or "").strip()
-    elif "template_base64" in payload:
-        tpl = (payload.get("template_base64") or "").strip()
-    elif "template_id" in payload:
-        tpl = "ID:" + str(payload.get("template_id"))
-    if not tpl:
-        return jsonify({"status":"error","message":"No fingerprint template or id provided"}), 400
-
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    # ensure no duplicate template
-    cur.execute("SELECT * FROM voters WHERE fingerprint_template = %s", (tpl,))
-    if cur.fetchone():
-        cur.close()
-        conn.close()
-        return jsonify({"status":"error","message":"Template already exists"}), 409
-
-    cur.execute("INSERT INTO voters (name, gender, fingerprint_template, has_voted) VALUES (%s, %s, %s, %s) RETURNING id", (name or "Unknown", gender or "Unknown", tpl, 0))
-    new_id = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({"status":"success","id": new_id, "name": name, "gender": gender}), 201
-
-
 def api_verify():
     payload = request.get_json(silent=True)
     if not payload or "fingerprint_template" not in payload:
