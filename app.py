@@ -9,17 +9,20 @@ from datetime import datetime
 from openpyxl import Workbook
 import csv
 import os
-
-app = Flask(__name__)
-app.secret_key = "supersecretkey_change_this"  # Change before production
+from functools import wraps
 
 # -------------------------
-# Permanent PostgreSQL Database
+# App Initialization
+# -------------------------
+app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "supersecretkey_change_this")  # Change for production
+
+# -------------------------
+# Database Setup
 # -------------------------
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def get_db_connection():
-    # Ensure DATABASE_URL is set in environment (Render sets it when you add a Postgres add-on)
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL environment variable is not set.")
     conn = psycopg2.connect(DATABASE_URL, sslmode="require")
@@ -47,12 +50,12 @@ def init_db():
 init_db()
 
 # -------------------------
-# Routes
+# Admin Config
 # -------------------------
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "12345")  # Change in production
 
-# Login required decorator
 def admin_required(f):
-    from functools import wraps
     @wraps(f)
     def decorated(*args, **kwargs):
         if not session.get("admin"):
@@ -60,8 +63,9 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
-ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "12345"  # Change to a strong password
+# -------------------------
+# Routes
+# -------------------------
 
 @app.route("/")
 def index():
@@ -117,9 +121,46 @@ def logout():
     return redirect(url_for("login"))
 
 # -------------------------
+# Stats Page
+# -------------------------
+@app.route("/stats")
+@admin_required
+def stats():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("SELECT COUNT(*) AS c FROM voters")
+    total = cur.fetchone()["c"] or 0
+    cur.execute("SELECT COUNT(*) AS c FROM voters WHERE has_voted=1")
+    voted = cur.fetchone()["c"] or 0
+    not_voted = total - voted
+    cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s", ("Male",))
+    male_total = cur.fetchone()["c"] or 0
+    cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s", ("Female",))
+    female_total = cur.fetchone()["c"] or 0
+    cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s AND has_voted=1", ("Male",))
+    male_voted = cur.fetchone()["c"] or 0
+    cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s AND has_voted=1", ("Female",))
+    female_voted = cur.fetchone()["c"] or 0
+    male_not_voted = male_total - male_voted
+    female_not_voted = female_total - female_voted
+    cur.close()
+    conn.close()
+    return render_template(
+        "stats.html",
+        total=total,
+        voted=voted,
+        not_voted=not_voted,
+        male_total=male_total,
+        female_total=female_total,
+        male_voted=male_voted,
+        female_voted=female_voted,
+        male_not_voted=male_not_voted,
+        female_not_voted=female_not_voted
+    )
+
+# -------------------------
 # Voter Management
 # -------------------------
-
 @app.route("/voters")
 @admin_required
 def voters():
@@ -193,7 +234,6 @@ def reset_votes():
 # -------------------------
 # Downloads
 # -------------------------
-
 @app.route("/download-excel")
 @admin_required
 def download_excel():
@@ -209,25 +249,13 @@ def download_excel():
     ws.title = "Voters"
     ws.append(["ID", "Name", "Gender", "Fingerprint Template", "Has Voted", "Created At"])
     for r in rows:
-        ws.append([
-            r["id"],
-            r["name"],
-            r["gender"],
-            r["fingerprint_template"],
-            "Yes" if r["has_voted"] else "No",
-            r["created_at"]
-        ])
+        ws.append([r["id"], r["name"], r["gender"], r["fingerprint_template"], "Yes" if r["has_voted"] else "No", r["created_at"]])
 
     virtual_wb = io.BytesIO()
     wb.save(virtual_wb)
     virtual_wb.seek(0)
     fname = f"voters-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.xlsx"
-    return send_file(
-        virtual_wb,
-        download_name=fname,
-        as_attachment=True,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    return send_file(virtual_wb, download_name=fname, as_attachment=True, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 @app.route("/download-csv")
 @admin_required
@@ -252,11 +280,13 @@ def download_csv():
     return send_file(mem, download_name=fname, as_attachment=True, mimetype="text/csv")
 
 # -------------------------
-# API for fingerprint verification
+# Fingerprint API
 # -------------------------
-
 @app.route("/api/enroll", methods=["POST"])
 def api_enroll():
     payload = request.get_json(silent=True)
     if not payload:
-        return jsonify({"status":"error","message":"No JSON body provided"}), 
+        return jsonify({"status":"error","message":"No JSON body provided"}), 400
+
+    name = (payload.get("name") or "").strip()
+    gender
