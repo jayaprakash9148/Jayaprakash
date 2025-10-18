@@ -67,7 +67,6 @@ ADMIN_PASSWORD = "12345"  # Change to a strong password
 def index():
     admin = session.get("admin", False)
     total = voted = 0
-    # provide male/female counts on dashboard only if admin (safe)
     male_total = female_total = male_voted = female_voted = 0
     if admin:
         conn = get_db_connection()
@@ -76,21 +75,16 @@ def index():
         total = cur.fetchone()["c"] or 0
         cur.execute("SELECT COUNT(*) AS c FROM voters WHERE has_voted=1")
         voted = cur.fetchone()["c"] or 0
-
-        # also compute male/female totals (useful for dashboard if template expects them)
         cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s", ("Male",))
         male_total = cur.fetchone()["c"] or 0
         cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s", ("Female",))
         female_total = cur.fetchone()["c"] or 0
-
         cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s AND has_voted=1", ("Male",))
         male_voted = cur.fetchone()["c"] or 0
         cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s AND has_voted=1", ("Female",))
         female_voted = cur.fetchone()["c"] or 0
-
         cur.close()
         conn.close()
-    # pass extra gender stats safely; templates that don't use them won't break
     return render_template(
         "index.html",
         admin=admin,
@@ -171,7 +165,6 @@ def delete_voter(voter_id):
     if password != ADMIN_PASSWORD:
         flash("❌ Wrong admin password. Voter not deleted.", "danger")
         return redirect(url_for("voters"))
-
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("DELETE FROM voters WHERE id = %s", (voter_id,))
@@ -261,133 +254,9 @@ def download_csv():
 # -------------------------
 # API for fingerprint verification
 # -------------------------
-@app.route("/api/verify", methods=["POST"])
 
 @app.route("/api/enroll", methods=["POST"])
 def api_enroll():
-    """
-    API endpoint for ESP enrollment.
-    Expected JSON payload:
-    {
-      "name": "Full Name",
-      "gender": "Male" or "Female" (optional, default "Unknown"),
-      "fingerprint_template": "<base64 or string>"  OR
-      "template_base64": "<base64 string>" OR
-      "template_id": 123
-    }
-    """
     payload = request.get_json(silent=True)
     if not payload:
-        return jsonify({"status":"error","message":"No JSON body provided"}), 400
-
-    name = (payload.get("name") or "").strip()
-    gender = (payload.get("gender") or "Unknown").strip()
-    tpl = None
-    if "fingerprint_template" in payload:
-        tpl = (payload.get("fingerprint_template") or "").strip()
-    elif "template_base64" in payload:
-        tpl = (payload.get("template_base64") or "").strip()
-    elif "template_id" in payload:
-        tpl = "ID:" + str(payload.get("template_id"))
-    if not tpl:
-        return jsonify({"status":"error","message":"No fingerprint template or id provided"}), 400
-
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    # ensure no duplicate template
-    cur.execute("SELECT * FROM voters WHERE fingerprint_template = %s", (tpl,))
-    if cur.fetchone():
-        cur.close()
-        conn.close()
-        return jsonify({"status":"error","message":"Template already exists"}), 409
-
-    cur.execute("INSERT INTO voters (name, gender, fingerprint_template, has_voted) VALUES (%s, %s, %s, %s) RETURNING id", (name or "Unknown", gender or "Unknown", tpl, 0))
-    new_id = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({"status":"success","id": new_id, "name": name, "gender": gender}), 201
-
-
-def api_verify():
-    payload = request.get_json(silent=True)
-    if not payload or "fingerprint_template" not in payload:
-        return jsonify({"status": "error", "message": "No template provided"}), 400
-
-    tpl = (payload["fingerprint_template"] or "").strip()
-    if not tpl:
-        return jsonify({"status": "error", "message": "Empty template"}), 400
-
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("SELECT * FROM voters WHERE fingerprint_template = %s", (tpl,))
-    r = cur.fetchone()
-    if not r:
-        cur.close()
-        conn.close()
-        return jsonify({"status": "error", "message": "Fingerprint not recognized"}), 404
-
-    if r["has_voted"]:
-        cur.close()
-        conn.close()
-        return jsonify({"status": "error", "message": "Already voted"}), 409
-
-    cur.execute("UPDATE voters SET has_voted = 1 WHERE id = %s", (r["id"],))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({"status": "success", "id": r["id"], "name": r["name"], "gender": r["gender"], "has_voted": 1})
-
-# -------------------------
-# Stats
-# -------------------------
-@app.route("/stats")
-@admin_required
-def stats():
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    # overall
-    cur.execute("SELECT COUNT(*) AS c FROM voters")
-    total = cur.fetchone()["c"] or 0
-    cur.execute("SELECT COUNT(*) AS c FROM voters WHERE has_voted=1")
-    voted = cur.fetchone()["c"] or 0
-    not_voted = total - voted
-
-    # gender splits
-    cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s", ("Male",))
-    male_total = cur.fetchone()["c"] or 0
-    cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s", ("Female",))
-    female_total = cur.fetchone()["c"] or 0
-
-    cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s AND has_voted=1", ("Male",))
-    male_voted = cur.fetchone()["c"] or 0
-    cur.execute("SELECT COUNT(*) AS c FROM voters WHERE gender = %s AND has_voted=1", ("Female",))
-    female_voted = cur.fetchone()["c"] or 0
-
-    # new: male/female not voted
-    male_not_voted = male_total - male_voted
-    female_not_voted = female_total - female_voted
-
-    cur.close()
-    conn.close()
-
-    return render_template(
-        "stats.html",
-        total=total,
-        voted=voted,
-        not_voted=not_voted,
-        male_total=male_total,
-        female_total=female_total,
-        male_voted=male_voted,
-        female_voted=female_voted,
-        male_not_voted=male_not_voted,
-        female_not_voted=female_not_voted
-    )
-
-# -------------------------
-# Run app
-# -------------------------
-if __name__ == "__main__":
-    # On Render the PORT is provided by the environment; for local dev keep 5000
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+        return jsonify({"status":"error","message":"No JSON body provided"}), 
