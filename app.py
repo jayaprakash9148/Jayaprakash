@@ -270,7 +270,7 @@ def download_csv():
     return send_file(mem, download_name=fname, as_attachment=True, mimetype="text/csv")
 
 # -------------------------
-# Fingerprint API (Dummy for Sensorless Testing)
+# Fingerprint API (Updated to Store in DB)
 # -------------------------
 @app.route("/api/enroll", methods=["POST"])
 def api_enroll():
@@ -282,12 +282,25 @@ def api_enroll():
     if not name or not gender or not template:
         return jsonify({"status":"error","message":"Name, gender, and fingerprint_template are required"}), 400
 
-    # Dummy response (no DB write)
-    return jsonify({
-        "status": "success",
-        "message": f"Enroll received for {name} ({gender})",
-        "template": template
-    }), 200
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO voters (name, gender, fingerprint_template) VALUES (%s, %s, %s)",
+            (name, gender, template)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({
+            "status": "success",
+            "message": f"Voter enrolled successfully: {name} ({gender})",
+            "template": template
+        }), 200
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/api/verify", methods=["POST"])
 def api_verify():
@@ -297,7 +310,7 @@ def api_verify():
     if not template:
         return jsonify({"status":"error","message":"Fingerprint template required"}), 400
 
-    # Dummy response
+    # Dummy response (you can later connect actual matching)
     return jsonify({
         "status": "success",
         "message": f"Verify received for template {template}",
