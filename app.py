@@ -305,6 +305,33 @@ def api_verify():
     }), 200
 
 # -------------------------
+# 🔹 Mark Voted API (Added for ESP32)
+# -------------------------
+@app.route("/api/mark_voted", methods=["POST"])
+def api_mark_voted():
+    payload = request.get_json(force=True)
+    template = (payload.get("fingerprint_template") or "").strip()
+
+    if not template:
+        return jsonify({"status": "error", "message": "Missing fingerprint_template"}), 400
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("UPDATE voters SET has_voted = 1 WHERE fingerprint_template = %s", (template,))
+        if cur.rowcount == 0:
+            conn.commit()
+            cur.close()
+            conn.close()
+            return jsonify({"status": "error", "message": "Voter not found"}), 404
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"status": "success", "message": f"Voter with template {template} marked as voted."}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# -------------------------
 # Vote API (Actual DB)
 # -------------------------
 @app.route("/api/vote", methods=["POST"])
